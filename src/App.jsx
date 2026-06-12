@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
+import Auth from "./Auth.jsx";
+import { supabaseReady, getSession, onAuthChange, getProfile, upsertProfile, getFitLog, upsertFitDay, computeStreak, signOut } from "./supabase.js";
 
 const SIGNS = [
   { name: "Aries", symbol: "♈︎", dates: "Mar 21 – Apr 19", element: "Fire", vibe: "bold, structured, energetic" },
@@ -66,6 +68,76 @@ export default function CosmicCloset() {
   const [calCursor, setCalCursor] = useState(() => { const d = new Date(); d.setDate(1); return d; });
   const [selDay, setSelDay] = useState(todayKey());
 
+  // ---- Auth state ----
+  const [user, setUser] = useState(null);
+  const [authPrompt, setAuthPrompt] = useState(false);
+  const [cloudProfile, setCloudProfile] = useState(null);
+  const [cloudFitLog, setCloudFitLog] = useState([]);
+  const [migrationOffer, setMigrationOffer] = useState(false);
+
+  // Subscribe to auth changes
+  useEffect(() => {
+    if (!supabaseReady) return;
+    getSession().then(s => { if (s?.user) handleLogin(s.user); });
+    return onAuthChange(session => {
+      if (session?.user) handleLogin(session.user);
+      else { setUser(null); setCloudProfile(null); setCloudFitLog([]); }
+    });
+  }, []);
+
+  async function handleLogin(u) {
+    setUser(u);
+    setAuthPrompt(false);
+    const p = await getProfile(u.id);
+    setCloudProfile(p);
+    const log = await getFitLog(u.id);
+    setCloudFitLog(log);
+    // Check if there's local data to migrate
+    const localFitLog = await sGet("fitLog");
+    const localProfile = await sGet("profile");
+    const hasLocalData = (localFitLog && Object.keys(localFitLog).length > 0) || (localProfile && (localProfile.sex || localProfile.zip || localProfile.age));
+    if (hasLocalData && log.length === 0 && !p?.sign) {
+      setMigrationOffer(true);
+    }
+  }
+
+  async function migrateLocalToCloud() {
+    if (!user) return;
+    // Migrate profile
+    const localProfile = await sGet("profile");
+    const localName = await sGet("displayName");
+    if (localProfile) {
+      await upsertProfile(user.id, { sign: sign?.name || localProfile.sign, sex: localProfile.sex, zip: localProfile.zip, age: localProfile.age, display_name: localName || "" });
+      const p = await getProfile(user.id);
+      setCloudProfile(p);
+    }
+    // Migrate fit log
+    const localFitLog = await sGet("fitLog");
+    if (localFitLog) {
+      for (const [date, entry] of Object.entries(localFitLog)) {
+        await upsertFitDay(user.id, date, { wore: entry.wore || false, fit: entry.fit || "", note: entry.note || "" });
+      }
+      const log = await getFitLog(user.id);
+      setCloudFitLog(log);
+    }
+    setMigrationOffer(false);
+  }
+
+  // Cloud-aware fit log helpers
+  function getEffectiveFitLog() {
+    if (user && cloudFitLog.length > 0) {
+      const obj = {};
+      for (const row of cloudFitLog) obj[row.date] = row;
+      return obj;
+    }
+    return fitLog;
+  }
+
+  function getEffectiveStreak() {
+    if (user && cloudFitLog.length > 0) return computeStreak(cloudFitLog);
+    return fitStreak();
+  }
+
   const dateObj = new Date(viewingDate + "T12:00:00");
   const isToday = viewingDate === todayKey();
   const dateLabel = dateObj.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }).toUpperCase();
@@ -87,8 +159,14 @@ export default function CosmicCloset() {
     })();
   }, []);
 
-  function saveFitDay(date, fields) {
-    setFitLog(prev => { const next = { ...prev, [date]: { ...prev[date], ...fields } }; sSet("fitLog", next); return next; });
+  async function saveFitDay(date, fields) {
+    if (user) {
+      await upsertFitDay(user.id, date, fields);
+      const log = await getFitLog(user.id);
+      setCloudFitLog(log);
+    } else {
+      setFitLog(prev => { const next = { ...prev, [date]: { ...prev[date], ...fields } }; sSet("fitLog", next); return next; });
+    }
   }
   function fitStreak() {
     let streak = 0; const d = new Date();
@@ -461,6 +539,18 @@ export default function CosmicCloset() {
 
       {!onboarded && profileLoaded && <Onboarding />}
       {showCard && reading && sign && <ShareCard />}
+      {authPrompt && <Auth onSkip={() => { setAuthPrompt(false); }} />}
+      {migrationOffer && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 250, padding: 20, fontFamily: fontStack }}>
+          <div style={{ width: "100%", maxWidth: 380, background: PANEL, border: `1px solid ${LINE}`, padding: "40px 30px 28px", textAlign: "center" }}>
+            <div style={{ fontSize: 22, marginBottom: 10 }}>✦</div>
+            <h2 className="up" style={{ fontSize: 13, fontWeight: 400, margin: "0 0 16px" }}>Import your saved progress?</h2>
+            <p style={{ color: GREY, fontSize: 11, lineHeight: 1.8, marginBottom: 24 }}>You have fits and preferences saved on this device. Want to sync them to your account?</p>
+            <button className="up" onClick={migrateLocalToCloud} style={{ width: "100%", background: WHITE, color: BLACK, border: "none", padding: 14, fontSize: 11, letterSpacing: "0.15em", fontFamily: fontStack, cursor: "pointer", marginBottom: 10 }}>Yes, import everything</button>
+            <button className="up" onClick={() => setMigrationOffer(false)} style={{ width: "100%", background: "transparent", color: GREY, border: `1px solid ${LINE}`, padding: 12, fontSize: 10, letterSpacing: "0.12em", fontFamily: fontStack, cursor: "pointer" }}>Skip — start fresh</button>
+          </div>
+        </div>
+      )}
 
       {/* transit ticker — the signature element */}
       <div style={{ borderBottom: `1px solid ${LINE}`, overflow: "hidden", whiteSpace: "nowrap", background: PANEL }}>
@@ -477,7 +567,11 @@ export default function CosmicCloset() {
         <span className="up">Cosmic Closet</span>
         <span style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <span className="up" style={{ color: GREY }}>{dateLabel}{!isToday && <span style={{ color: ACCENT }}> · ARCHIVE</span>}</span>
-          <button className="chip up" onClick={() => setView(view === "profile" ? "today" : "profile")} style={{ background: view === "profile" ? WHITE : "transparent", color: view === "profile" ? BLACK : WHITE, border: `1px solid ${LINE}`, padding: "6px 11px", fontSize: 9, fontFamily: fontStack, cursor: "pointer" }}>
+          <button className="chip up" onClick={() => {
+            if (view === "profile") { setView("today"); return; }
+            if (!user && supabaseReady) { setAuthPrompt(true); return; }
+            setView("profile");
+          }} style={{ background: view === "profile" ? WHITE : "transparent", color: view === "profile" ? BLACK : WHITE, border: `1px solid ${LINE}`, padding: "6px 11px", fontSize: 9, fontFamily: fontStack, cursor: "pointer" }}>
             {view === "profile" ? "← Today" : (displayName ? displayName.slice(0, 12) : "Profile")}
           </button>
         </span>
@@ -607,9 +701,13 @@ export default function CosmicCloset() {
                 </div>
                 <div style={{ display: "flex", gap: 10, marginTop: 20, flexWrap: "wrap" }}>
                   {(() => {
-                    const wore = fitLog[viewingDate]?.wore;
+                    const eff = getEffectiveFitLog();
+                    const wore = eff[viewingDate]?.wore;
                     return (
-                      <button className="up" onClick={() => saveFitDay(viewingDate, { wore: !wore, fit: !wore ? (reading.fitName || reading.keyword || "") : (fitLog[viewingDate]?.fit || "") })}
+                      <button className="up" onClick={() => {
+                        if (!user && supabaseReady) { setAuthPrompt(true); return; }
+                        saveFitDay(viewingDate, { wore: !wore, fit: !wore ? (reading.fitName || reading.keyword || "") : (eff[viewingDate]?.fit || "") });
+                      }}
                         style={{ background: wore ? ACCENT : "transparent", color: wore ? BLACK : WHITE, border: `1px solid ${wore ? ACCENT : LINE}`, padding: "11px 18px", fontSize: 10, letterSpacing: "0.14em", fontFamily: fontStack, cursor: "pointer", fontWeight: 600 }}>
                         {wore ? "✓ Wore it" : "Wore the fit?"}
                       </button>
@@ -620,8 +718,8 @@ export default function CosmicCloset() {
                     <button className="up" onClick={() => generate(sign, todayKey())} style={{ background: "transparent", color: GREY, border: `1px solid ${LINE}`, padding: "11px 16px", fontSize: 9, fontFamily: fontStack, cursor: "pointer" }}>↻ Re-read today</button>
                   )}
                 </div>
-                {fitStreak() > 1 && (
-                  <div className="up" style={{ marginTop: 16, fontSize: 9, color: ACCENT, letterSpacing: "0.14em" }}>🔥 {fitStreak()}-day fit streak</div>
+                {getEffectiveStreak() > 1 && (
+                  <div className="up" style={{ marginTop: 16, fontSize: 9, color: ACCENT, letterSpacing: "0.14em" }}>🔥 {getEffectiveStreak()}-day fit streak</div>
                 )}
               </div>
             )}
@@ -688,32 +786,60 @@ export default function CosmicCloset() {
     </div>
   );
 
-  // ---------- Profile + fit calendar (preview: saved in-browser) ----------
+  // ---------- Profile + fit calendar ----------
   function ProfileView() {
-    const sel = fitLog[selDay] || {};
-    const [nm, setNm] = useState(displayName);
+    const eff = getEffectiveFitLog();
+    const sel = eff[selDay] || {};
+    const [nm, setNm] = useState(user ? (cloudProfile?.display_name || "") : displayName);
     const [wore, setWore] = useState(sel.wore || false);
     const [fit, setFit] = useState(sel.fit || "");
     const [note, setNote] = useState(sel.note || "");
-    useEffect(() => { const s = fitLog[selDay] || {}; setWore(s.wore || false); setFit(s.fit || ""); setNote(s.note || ""); }, [selDay]);
+    useEffect(() => { const s = eff[selDay] || {}; setWore(s.wore || false); setFit(s.fit || ""); setNote(s.note || ""); }, [selDay, cloudFitLog]);
 
     const first = new Date(calCursor);
     const startDay = first.getDay();
     const daysInMonth = new Date(calCursor.getFullYear(), calCursor.getMonth() + 1, 0).getDate();
     const cells = []; for (let i = 0; i < startDay; i++) cells.push(null); for (let d = 1; d <= daysInMonth; d++) cells.push(d);
     const monthName = calCursor.toLocaleDateString("en-US", { month: "long", year: "numeric" }).toUpperCase();
-    const woreCount = Object.values(fitLog).filter(r => r?.wore).length;
+    const woreCount = user ? cloudFitLog.filter(r => r?.wore).length : Object.values(fitLog).filter(r => r?.wore).length;
+    const streak = getEffectiveStreak();
     const up = { textTransform: "uppercase", letterSpacing: "0.18em" };
     const btn = { border: `1px solid ${LINE}`, background: "transparent", color: WHITE, fontFamily: fontStack, cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.12em" };
     const fld = { width: "100%", background: "transparent", border: `1px solid ${LINE}`, color: WHITE, padding: 12, fontSize: 12, fontFamily: fontStack, letterSpacing: "0.06em" };
 
+    async function saveName() {
+      const trimmed = nm.trim();
+      if (user) {
+        await upsertProfile(user.id, { display_name: trimmed });
+        const p = await getProfile(user.id);
+        setCloudProfile(p);
+      }
+      setDisplayName(trimmed);
+      sSet("displayName", trimmed);
+    }
+
+    async function handleSignOut() {
+      await signOut();
+      setUser(null);
+      setCloudProfile(null);
+      setCloudFitLog([]);
+      setView("today");
+    }
+
     return (
       <main style={{ maxWidth: 760, margin: "0 auto", position: "relative", zIndex: 1, padding: "0 24px 80px" }}>
+        {user && (
+          <section style={{ padding: "30px 0", borderBottom: `1px solid ${LINE}` }}>
+            <div style={{ ...up, fontSize: 10, color: GREY, marginBottom: 6 }}>Signed in as</div>
+            <div style={{ fontSize: 13, color: GREY, marginBottom: 18, wordBreak: "break-all" }}>{user.email}</div>
+          </section>
+        )}
+
         <section style={{ padding: "30px 0", borderBottom: `1px solid ${LINE}` }}>
           <div style={{ ...up, fontSize: 10, color: GREY, marginBottom: 8 }}>Display name</div>
           <div style={{ display: "flex", gap: 8 }}>
             <input style={fld} value={nm} onChange={e => setNm(e.target.value)} placeholder="WHAT THE STARS CALL YOU" />
-            <button style={{ ...btn, padding: "0 16px", background: WHITE, color: BLACK }} onClick={() => { setDisplayName(nm.trim()); sSet("displayName", nm.trim()); }}>Save</button>
+            <button style={{ ...btn, padding: "0 16px", background: WHITE, color: BLACK }} onClick={saveName}>Save</button>
           </div>
           <div style={{ ...up, fontSize: 9, color: DIM, marginTop: 12 }}>{[sex || "—", weather ? `${weather.place}` : (zip || "no location"), age ? `age ${age}` : "no age"].join("  ·  ")}</div>
         </section>
@@ -721,7 +847,7 @@ export default function CosmicCloset() {
         <section style={{ padding: "28px 0", borderBottom: `1px solid ${LINE}`, display: "flex", gap: 32 }}>
           <div>
             <div style={{ ...up, fontSize: 10, color: ACCENT }}>Current streak</div>
-            <div style={{ fontSize: 40, fontWeight: 300, marginTop: 4 }}>{fitStreak()}<span style={{ fontSize: 13, color: GREY, marginLeft: 8 }}>days</span></div>
+            <div style={{ fontSize: 40, fontWeight: 300, marginTop: 4 }}>{streak}<span style={{ fontSize: 13, color: GREY, marginLeft: 8 }}>days</span></div>
           </div>
           <div>
             <div style={{ ...up, fontSize: 10, color: GREY }}>Fits logged</div>
@@ -740,7 +866,7 @@ export default function CosmicCloset() {
             {cells.map((d, i) => {
               if (!d) return <div key={i} />;
               const key = new Date(calCursor.getFullYear(), calCursor.getMonth(), d).toISOString().slice(0, 10);
-              const row = fitLog[key]; const isToday = key === todayKey(); const isSel = key === selDay; const future = key > todayKey();
+              const row = eff[key]; const isToday = key === todayKey(); const isSel = key === selDay; const future = key > todayKey();
               return (
                 <button key={i} disabled={future} onClick={() => setSelDay(key)}
                   style={{ aspectRatio: "1", border: `1px solid ${isSel ? WHITE : LINE}`, background: row?.wore ? ACCENT : (isSel ? "rgba(244,244,240,0.06)" : "transparent"), color: row?.wore ? BLACK : (future ? DIM : WHITE), fontFamily: fontStack, fontSize: 12, cursor: future ? "default" : "pointer", position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -768,6 +894,10 @@ export default function CosmicCloset() {
           <textarea style={{ ...fld, minHeight: 70, resize: "vertical", marginBottom: 14 }} value={note} onChange={e => setNote(e.target.value)} onBlur={() => saveFitDay(selDay, { note: note.trim() })} placeholder="HOW IT LANDED. WHAT YOU'D CHANGE." />
           <button style={{ ...btn, ...up, width: "100%", padding: 13, fontSize: 11, background: WHITE, color: BLACK }} onClick={() => { saveFitDay(selDay, { wore, fit: fit.trim(), note: note.trim() }); setView("today"); }}>Save day</button>
         </section>
+
+        {user && (
+          <button className="up" onClick={handleSignOut} style={{ width: "100%", background: "transparent", color: GREY, border: `1px solid ${LINE}`, padding: 12, fontSize: 9, letterSpacing: "0.15em", fontFamily: fontStack, cursor: "pointer", marginBottom: 20 }}>Sign out</button>
+        )}
       </main>
     );
   }
