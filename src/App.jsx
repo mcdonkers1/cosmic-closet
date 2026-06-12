@@ -67,6 +67,7 @@ export default function CosmicCloset() {
   const [facing, setFacing] = useState("front");
   const [spinning, setSpinning] = useState(false);
   const [custOpen, setCustOpen] = useState(false);
+  const [custTab, setCustTab] = useState("look");
   const [hoverItem, setHoverItem] = useState(null);
   const [displayName, setDisplayName] = useState("");
   const [fitLog, setFitLog] = useState({});           // { "YYYY-MM-DD": {wore, fit, note} }
@@ -1446,14 +1447,14 @@ export default function CosmicCloset() {
               <button className="chip up" onClick={() => setCustOpen(o => !o)} style={{ background: custOpen ? WHITE : "transparent", color: custOpen ? BLACK : GREY, border: `1px solid ${LINE}`, padding: "6px 11px", fontSize: 9, fontFamily: fontStack, cursor: "pointer" }}>Customize</button>
             </div>
             {custOpen && (() => {
-              const [openTab, setOpenTab] = React.useState("look");
+              const openTab = custTab, setOpenTab = setCustTab;
               const tabs = [["look", "Look"], ["style", "Style"], ["scene", "Scene"]];
               const tabBtn = (id, label) => (
                 <button key={id} className="up" onClick={() => setOpenTab(openTab === id ? "" : id)} style={{ flex: 1, background: openTab === id ? "rgba(244,244,240,0.06)" : "transparent", color: openTab === id ? WHITE : GREY, border: `1px solid ${openTab === id ? LINE : "transparent"}`, padding: "10px 8px", fontSize: 9, letterSpacing: "0.14em", fontFamily: fontStack, cursor: "pointer", borderBottom: openTab === id ? `1px solid ${ACCENT}` : `1px solid ${LINE}` }}>{label}</button>
               );
               const row = { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" };
               const lbl = { fontSize: 9, color: GREY, width: 64, letterSpacing: "0.12em" };
-              const chip = (val, cur, onClick) => ({ background: val === cur ? WHITE : "transparent", color: val === cur ? BLACK : WHITE, border: `1px solid ${LINE}`, padding: "6px 10px", fontSize: 9, fontFamily: fontStack, cursor: "pointer" });
+              const chip = (val, cur) => ({ background: val === cur ? WHITE : "transparent", color: val === cur ? BLACK : WHITE, border: `1px solid ${LINE}`, padding: "6px 10px", fontSize: 9, fontFamily: fontStack, cursor: "pointer" });
               return (
                 <div style={{ border: `1px solid ${LINE}`, marginBottom: 20 }}>
                   <div style={{ display: "flex", borderBottom: `1px solid ${LINE}` }}>
