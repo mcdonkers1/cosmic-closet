@@ -1445,72 +1445,92 @@ export default function CosmicCloset() {
               <span className="up" style={{ fontSize: 11 }}>Fit check</span>
               <button className="chip up" onClick={() => setCustOpen(o => !o)} style={{ background: custOpen ? WHITE : "transparent", color: custOpen ? BLACK : GREY, border: `1px solid ${LINE}`, padding: "6px 11px", fontSize: 9, fontFamily: fontStack, cursor: "pointer" }}>Customize</button>
             </div>
-            {custOpen && (
-              <div style={{ border: `1px solid ${LINE}`, padding: "16px 18px", marginBottom: 20, display: "grid", gap: 14 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                  <span className="up" style={{ fontSize: 9, color: GREY, width: 64, letterSpacing: "0.12em" }}>Skin</span>
-                  {["#F8E0C8", "#F2D6B3", "#E6C39A", "#D4A574", "#C68642", "#A86B3C", "#8D5524", "#6B4220", "#5C3A21", "#3E2814"].map(c => (
-                    <button key={c} onClick={() => setAvatarPref("skin", c)} aria-label={`Skin tone ${c}`} style={{ width: 22, height: 22, background: c, border: avatarPrefs.skin === c ? `2px solid ${ACCENT}` : `1px solid ${LINE}`, cursor: "pointer", padding: 0 }} />
-                  ))}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <span className="up" style={{ fontSize: 9, color: GREY, width: 64, letterSpacing: "0.12em" }}>Hair</span>
-                  {["short", "buzz", "bob", "long", "curly", "pony", "afro", "mohawk", "manbun", "waves"].map(h => (
-                    <button key={h} className="chip up" onClick={() => setAvatarPref("hair", h)} style={{ background: avatarPrefs.hair === h ? WHITE : "transparent", color: avatarPrefs.hair === h ? BLACK : WHITE, border: `1px solid ${LINE}`, padding: "6px 10px", fontSize: 9, fontFamily: fontStack, cursor: "pointer" }}>{h}</button>
-                  ))}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                  <span className="up" style={{ fontSize: 9, color: GREY, width: 64, letterSpacing: "0.12em" }}>Hair color</span>
-                  {["#2E2620", "#5A3A22", "#8B5A2B", "#C9A55A", "#E8C87A", "#A8A8A6", "#8A8A88", "#3A3A3A", "#7A3B2E", "#9C4A3C", "#C95A8A", "#5A6BA8", "#4A8C6B", "#7A5AA8"].map(c => (
-                    <button key={c} onClick={() => setAvatarPref("hairColor", c)} aria-label={`Hair color ${c}`} style={{ width: 22, height: 22, background: c, border: avatarPrefs.hairColor === c ? `2px solid ${ACCENT}` : `1px solid ${LINE}`, cursor: "pointer", padding: 0 }} />
-                  ))}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <span className="up" style={{ fontSize: 9, color: GREY, width: 64, letterSpacing: "0.12em" }}>Glasses</span>
-                  {["none", "regular", "round", "square"].map(g => (
-                    <button key={g} className="chip up" onClick={() => setAvatarPref("glasses", g)} style={{ background: avatarPrefs.glasses === g ? WHITE : "transparent", color: avatarPrefs.glasses === g ? BLACK : WHITE, border: `1px solid ${LINE}`, padding: "6px 10px", fontSize: 9, fontFamily: fontStack, cursor: "pointer" }}>{g}</button>
-                  ))}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <span className="up" style={{ fontSize: 9, color: GREY, width: 64, letterSpacing: "0.12em" }}>Hat</span>
-                  {["auto", "none", "cap", "trucker", "cowboy", "durag", "beanie", "skully"].map(h => (
-                    <button key={h} className="chip up" onClick={() => setAvatarPref("hat", h)} style={{ background: (avatarPrefs.hat || "auto") === h ? WHITE : "transparent", color: (avatarPrefs.hat || "auto") === h ? BLACK : WHITE, border: `1px solid ${LINE}`, padding: "6px 10px", fontSize: 9, fontFamily: fontStack, cursor: "pointer" }}>{h}</button>
-                  ))}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <span className="up" style={{ fontSize: 9, color: GREY, width: 64, letterSpacing: "0.12em" }}>Graphic</span>
-                  {["none", "monogram", "cross", "crest", "stripe", "star"].map(g => (
-                    <button key={g} className="chip up" onClick={() => { setAvatarPref("graphic", g); if (g === "monogram" && !avatarPrefs.initials && displayName) setAvatarPref("initials", displayName.trim().split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase()); }} style={{ background: avatarPrefs.graphic === g ? WHITE : "transparent", color: avatarPrefs.graphic === g ? BLACK : WHITE, border: `1px solid ${LINE}`, padding: "6px 10px", fontSize: 9, fontFamily: fontStack, cursor: "pointer" }}>{g}</button>
-                  ))}
-                </div>
-                {avatarPrefs.graphic === "monogram" && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span className="up" style={{ fontSize: 9, color: GREY, width: 64, letterSpacing: "0.12em" }}>Initials</span>
-                    <input value={avatarPrefs.initials || ""} maxLength={2} onChange={e => setAvatarPref("initials", e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2))} placeholder="CC" className="up" style={{ width: 56, background: "transparent", border: `1px solid ${LINE}`, color: WHITE, padding: "8px 10px", fontSize: 12, letterSpacing: "0.2em", fontFamily: fontStack, textAlign: "center" }} />
+            {custOpen && (() => {
+              const [openTab, setOpenTab] = React.useState("look");
+              const tabs = [["look", "Look"], ["style", "Style"], ["scene", "Scene"]];
+              const tabBtn = (id, label) => (
+                <button key={id} className="up" onClick={() => setOpenTab(openTab === id ? "" : id)} style={{ flex: 1, background: openTab === id ? "rgba(244,244,240,0.06)" : "transparent", color: openTab === id ? WHITE : GREY, border: `1px solid ${openTab === id ? LINE : "transparent"}`, padding: "10px 8px", fontSize: 9, letterSpacing: "0.14em", fontFamily: fontStack, cursor: "pointer", borderBottom: openTab === id ? `1px solid ${ACCENT}` : `1px solid ${LINE}` }}>{label}</button>
+              );
+              const row = { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" };
+              const lbl = { fontSize: 9, color: GREY, width: 64, letterSpacing: "0.12em" };
+              const chip = (val, cur, onClick) => ({ background: val === cur ? WHITE : "transparent", color: val === cur ? BLACK : WHITE, border: `1px solid ${LINE}`, padding: "6px 10px", fontSize: 9, fontFamily: fontStack, cursor: "pointer" });
+              return (
+                <div style={{ border: `1px solid ${LINE}`, marginBottom: 20 }}>
+                  <div style={{ display: "flex", borderBottom: `1px solid ${LINE}` }}>
+                    {tabs.map(([id, label]) => tabBtn(id, label))}
                   </div>
-                )}
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <span className="up" style={{ fontSize: 9, color: GREY, width: 64, letterSpacing: "0.12em" }}>Scene</span>
-                  {["void", "city", "park", "beach", "room", "night", "airport", "restaurant", "club", "soccer", "court"].map(sc => (
-                    <button key={sc} className="chip up" onClick={() => setAvatarPref("scene", sc)} style={{ background: avatarPrefs.scene === sc || (!avatarPrefs.scene && sc === "void") ? WHITE : "transparent", color: avatarPrefs.scene === sc || (!avatarPrefs.scene && sc === "void") ? BLACK : WHITE, border: `1px solid ${LINE}`, padding: "6px 10px", fontSize: 9, fontFamily: fontStack, cursor: "pointer" }}>{sc}</button>
-                  ))}
+                  <div style={{ padding: "14px 18px", display: "grid", gap: 14 }}>
+                    {openTab === "look" && <>
+                      <div style={row}>
+                        <span className="up" style={lbl}>Skin</span>
+                        {["#F8E0C8", "#F2D6B3", "#E6C39A", "#D4A574", "#C68642", "#A86B3C", "#8D5524", "#6B4220", "#5C3A21", "#3E2814"].map(c => (
+                          <button key={c} onClick={() => setAvatarPref("skin", c)} aria-label={`Skin tone ${c}`} style={{ width: 22, height: 22, background: c, border: avatarPrefs.skin === c ? `2px solid ${ACCENT}` : `1px solid ${LINE}`, cursor: "pointer", padding: 0 }} />
+                        ))}
+                      </div>
+                      <div style={row}>
+                        <span className="up" style={lbl}>Hair</span>
+                        {["short", "buzz", "bob", "long", "curly", "pony", "afro", "mohawk", "manbun", "waves"].map(h => (
+                          <button key={h} className="chip up" onClick={() => setAvatarPref("hair", h)} style={chip(h, avatarPrefs.hair)}>{h}</button>
+                        ))}
+                      </div>
+                      <div style={row}>
+                        <span className="up" style={lbl}>Hair color</span>
+                        {["#2E2620", "#5A3A22", "#8B5A2B", "#C9A55A", "#E8C87A", "#A8A8A6", "#8A8A88", "#3A3A3A", "#7A3B2E", "#9C4A3C", "#C95A8A", "#5A6BA8", "#4A8C6B", "#7A5AA8"].map(c => (
+                          <button key={c} onClick={() => setAvatarPref("hairColor", c)} aria-label={`Hair color ${c}`} style={{ width: 22, height: 22, background: c, border: avatarPrefs.hairColor === c ? `2px solid ${ACCENT}` : `1px solid ${LINE}`, cursor: "pointer", padding: 0 }} />
+                        ))}
+                      </div>
+                      <div style={row}>
+                        <span className="up" style={lbl}>Glasses</span>
+                        {["none", "regular", "round", "square"].map(g => (
+                          <button key={g} className="chip up" onClick={() => setAvatarPref("glasses", g)} style={chip(g, avatarPrefs.glasses)}>{g}</button>
+                        ))}
+                      </div>
+                    </>}
+                    {openTab === "style" && <>
+                      <div style={row}>
+                        <span className="up" style={lbl}>Hat</span>
+                        {["auto", "none", "cap", "trucker", "cowboy", "durag", "beanie", "skully"].map(h => (
+                          <button key={h} className="chip up" onClick={() => setAvatarPref("hat", h)} style={chip(h, avatarPrefs.hat || "auto")}>{h}</button>
+                        ))}
+                      </div>
+                      <div style={row}>
+                        <span className="up" style={lbl}>Graphic</span>
+                        {["none", "monogram", "cross", "crest", "stripe", "star"].map(g => (
+                          <button key={g} className="chip up" onClick={() => { setAvatarPref("graphic", g); if (g === "monogram" && !avatarPrefs.initials && displayName) setAvatarPref("initials", displayName.trim().split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase()); }} style={chip(g, avatarPrefs.graphic)}>{g}</button>
+                        ))}
+                      </div>
+                      {avatarPrefs.graphic === "monogram" && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <span className="up" style={lbl}>Initials</span>
+                          <input value={avatarPrefs.initials || ""} maxLength={2} onChange={e => setAvatarPref("initials", e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2))} placeholder="CC" className="up" style={{ width: 56, background: "transparent", border: `1px solid ${LINE}`, color: WHITE, padding: "8px 10px", fontSize: 12, letterSpacing: "0.2em", fontFamily: fontStack, textAlign: "center" }} />
+                        </div>
+                      )}
+                      <div style={row}>
+                        <span className="up" style={lbl}>Carry</span>
+                        {["none", "bag", "tote", "laptop", "luggage", "headphones"].map(ac => (
+                          <button key={ac} className="chip up" onClick={() => setAvatarPref("accessory", ac)} style={chip(ac, avatarPrefs.accessory || "none")}>{ac}</button>
+                        ))}
+                      </div>
+                      <div style={row}>
+                        <span className="up" style={lbl}>Budget</span>
+                        {[["$", "thrift"], ["$$", "mid"], ["$$$", "premium"], ["$$$$", "luxury"]].map(([sym, lbl]) => (
+                          <button key={sym} className="chip up" onClick={() => { setAvatarPref("budget", sym); if (sign && !loading) generate(sign, todayKey(), sym); }} title={lbl} style={{ background: (avatarPrefs.budget || "$$") === sym ? ACCENT : "transparent", color: (avatarPrefs.budget || "$$") === sym ? BLACK : WHITE, border: `1px solid ${(avatarPrefs.budget || "$$") === sym ? ACCENT : LINE}`, padding: "6px 12px", fontSize: 11, fontFamily: fontStack, cursor: "pointer", fontWeight: 600, letterSpacing: "0.05em" }}>{sym}</button>
+                        ))}
+                      </div>
+                      <div className="up" style={{ fontSize: 8, color: DIM, letterSpacing: "0.1em" }}>Budget restyles today's fit · $ thrift → $$$$ ultra-luxury</div>
+                    </>}
+                    {openTab === "scene" && <>
+                      <div style={row}>
+                        <span className="up" style={lbl}>Scene</span>
+                        {["void", "city", "park", "beach", "room", "night", "airport", "restaurant", "club", "soccer", "court"].map(sc => (
+                          <button key={sc} className="chip up" onClick={() => setAvatarPref("scene", sc)} style={chip(sc, avatarPrefs.scene || "void")}>{sc}</button>
+                        ))}
+                      </div>
+                    </>}
+                  </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <span className="up" style={{ fontSize: 9, color: GREY, width: 64, letterSpacing: "0.12em" }}>Carry</span>
-                  {["none", "bag", "tote", "laptop", "luggage", "headphones"].map(ac => (
-                    <button key={ac} className="chip up" onClick={() => setAvatarPref("accessory", ac)} style={{ background: avatarPrefs.accessory === ac || (!avatarPrefs.accessory && ac === "none") ? WHITE : "transparent", color: avatarPrefs.accessory === ac || (!avatarPrefs.accessory && ac === "none") ? BLACK : WHITE, border: `1px solid ${LINE}`, padding: "6px 10px", fontSize: 9, fontFamily: fontStack, cursor: "pointer" }}>{ac}</button>
-                  ))}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <span className="up" style={{ fontSize: 9, color: GREY, width: 64, letterSpacing: "0.12em" }}>Budget</span>
-                  {[["$", "thrift"], ["$$", "mid"], ["$$$", "premium"], ["$$$$", "luxury"]].map(([sym, lbl]) => (
-                    <button key={sym} className="chip up" onClick={() => { setAvatarPref("budget", sym); if (sign && !loading) generate(sign, todayKey(), sym); }} title={lbl} style={{ background: (avatarPrefs.budget || "$$") === sym ? ACCENT : "transparent", color: (avatarPrefs.budget || "$$") === sym ? BLACK : WHITE, border: `1px solid ${(avatarPrefs.budget || "$$") === sym ? ACCENT : LINE}`, padding: "6px 12px", fontSize: 11, fontFamily: fontStack, cursor: "pointer", fontWeight: 600, letterSpacing: "0.05em" }}>{sym}</button>
-                  ))}
-                </div>
-                <div className="up" style={{ fontSize: 8, color: DIM, letterSpacing: "0.1em" }}>Budget restyles today's fit instantly · $ thrift → $$$$ ultra-luxury</div>
-                <div className="up" style={{ fontSize: 8, color: DIM, letterSpacing: "0.1em" }}>Original marks only · graphics show on tees, tanks, hoodies, knits & shirts</div>
-              </div>
-            )}
+              );
+            })()}
             <div style={{ display: "flex", gap: 16, alignItems: "flex-start", justifyContent: "center", flexWrap: "wrap" }}>
               <div style={{ textAlign: "center" }}>
               <div style={{ display: "inline-block", position: "relative", background: "#0D0D10", border: `1px solid ${LINE}`, width: "min(380px, 90vw)", overflow: "hidden" }}>
