@@ -4,7 +4,12 @@ You (Claude Code) are picking up **Cosmic Closet**: a Co-Star-style daily horosc
 
 ## State of the project — what already works
 
-- `src/App.jsx` — the entire front-end, fully featured and current:
+- `src/App.jsx` — the entire front-end, fully featured and CURRENT (synced from the latest design iteration). Includes everything below PLUS the full 8-bit character system:
+  - **8-bit "Fit Check" pixel character** (`PixelAvatar`): DS-style sprite with outlines/shading/face, separated limbs, 360° spin (front/right/back/left), idle bob/blink. Reflects profile: distinct **male/female bodies** (shoulders vs waist+hip silhouette) and **age** proportions (child/teen/adult/elder).
+  - **Customize panel**: 10 skin tones, 10 hairstyles, 14 hair colors, glasses (none/regular/round/square), **6 hats** (cap/trucker/cowboy/durag/beanie/skully) + auto/none, chest **graphics** (monogram upper-right/cross/crest/stripe/star), 11 **scenes** (void/city/park/beach/room/night/airport/restaurant/club/soccer/court), 5 **accessories** (bag/tote/laptop/luggage-on-ground/headphones), and a **Budget tier $–$$$$** that visibly restyles garments+palette (`applyTier`) AND regenerates the written fit.
+  - **Shop panel**: click an item on the character (top/bottom/shoes/eyewear/accessory — invisible hotspots) → side panel with a sex+tier-aware shopping **search** link (`shopQuery` bakes in men's/women's + tier word). Product thumbnail loads on deploy (external image host; blocked only in the in-chat sandbox).
+  - **Share card** (`ShareCard`): story-sized SVG→PNG with the pixel character as the hero, today's fit, soundtrack. Uses the saved-day snapshot for logged days.
+  - Profile fit calendar stores an avatar+prefs **snapshot per logged day** (the visual fit archive).
   - Onboarding (sex / city-or-ZIP weather via Open-Meteo / age), saved sign with auto-load
   - Daily reading (Power/Pressure/Trouble/The Fit/Do this) with per-day caching, 7-day history, anti-repeat daily variation, named fit styles
   - The Soundtrack (5 tracks with Spotify/Apple search deep links)
