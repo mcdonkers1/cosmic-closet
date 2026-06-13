@@ -1893,6 +1893,77 @@ export default function CosmicCloset() {
     const fld = { width: "100%", background: "transparent", border: `1px solid ${LINE}`, color: WHITE, padding: 10, fontSize: 11, fontFamily: fontStack, letterSpacing: "0.04em" };
     const furniture = FURNITURE[room] || [];
 
+    // DJ Panel with Spotify 30-second previews
+    function DJPanel({ playlist, accent }) {
+      const [tracks, setTracks] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [playing, setPlaying] = useState(null);
+      const audioRef = useRef(null);
+
+      useEffect(() => {
+        let cancelled = false;
+        (async () => {
+          setLoading(true);
+          const results = [];
+          for (const song of playlist.slice(0, 5)) {
+            try {
+              const res = await fetch(`/api/spotify?q=${encodeURIComponent(song.replace(/—/g, "-"))}`);
+              const data = await res.json();
+              results.push({ query: song, ...data });
+            } catch { results.push({ query: song, found: false }); }
+          }
+          if (!cancelled) { setTracks(results); setLoading(false); }
+        })();
+        return () => { cancelled = true; };
+      }, [playlist]);
+
+      function togglePlay(idx) {
+        const t = tracks[idx];
+        if (!t?.preview_url) return;
+        if (playing === idx) {
+          audioRef.current?.pause();
+          setPlaying(null);
+        } else {
+          if (audioRef.current) audioRef.current.pause();
+          const a = new Audio(t.preview_url);
+          a.volume = 0.5;
+          a.play();
+          a.onended = () => setPlaying(null);
+          audioRef.current = a;
+          setPlaying(idx);
+        }
+      }
+
+      useEffect(() => { return () => { if (audioRef.current) audioRef.current.pause(); }; }, []);
+
+      return (
+        <div style={{ padding: "16px 24px", borderTop: `2px solid ${accent}`, background: "rgba(0,0,0,0.4)" }}>
+          <div className="up" style={{ fontSize: 11, color: accent, marginBottom: 12, letterSpacing: "0.16em" }}>🎧 DJ Booth — Your Playlist</div>
+          {loading ? (
+            <div style={{ display: "flex", gap: 8 }}>{[1,2,3].map(i => <div key={i} className="skel" style={{ height: 48, flex: 1 }} />)}</div>
+          ) : (
+            <div style={{ display: "grid", gap: 6 }}>
+              {tracks.map((t, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, background: playing === i ? `${accent}15` : "rgba(255,255,255,0.04)", border: `1px solid ${playing === i ? accent : LINE}`, padding: "8px 12px", transition: "all .15s" }}>
+                  {t.found && t.image && <img src={t.image} alt="" style={{ width: 36, height: 36, objectFit: "cover" }} />}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, color: WHITE, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.found ? t.name : t.query}</div>
+                    {t.found && <div style={{ fontSize: 10, color: GREY, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.artist}</div>}
+                  </div>
+                  {t.found && t.preview_url ? (
+                    <button onClick={() => togglePlay(i)} style={{ background: playing === i ? accent : "transparent", color: playing === i ? BLACK : WHITE, border: `1px solid ${playing === i ? accent : LINE}`, width: 32, height: 32, fontSize: 14, cursor: "pointer", fontFamily: fontStack, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{playing === i ? "■" : "▶"}</button>
+                  ) : t.found ? (
+                    <a href={t.spotify_url} target="_blank" rel="noopener noreferrer" style={{ color: GREY, fontSize: 9, textDecoration: "none", border: `1px solid ${LINE}`, padding: "4px 8px", fontFamily: fontStack, letterSpacing: "0.1em", textTransform: "uppercase", flexShrink: 0 }}>Open</a>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="up" style={{ fontSize: 8, color: DIM, marginTop: 10, letterSpacing: "0.1em" }}>Walk onto the DJ booth to play · Walk away to stop</div>
+        </div>
+      );
+    }
+
     return (
       <div style={{ position: "relative", zIndex: 1 }}>
         {/* Room header + nav */}
@@ -1960,25 +2031,8 @@ export default function CosmicCloset() {
           </div>
         </div>
 
-        {/* DJ Interaction — Spotify embed previews */}
-        {interacting?.type === "dj" && interacting.playlist?.length > 0 && (
-          <div style={{ padding: "16px 24px", borderTop: `2px solid ${R.accent}`, background: "rgba(0,0,0,0.4)" }}>
-            <div className="up" style={{ fontSize: 11, color: R.accent, marginBottom: 12, letterSpacing: "0.16em" }}>🎧 DJ Booth — Your Playlist</div>
-            <div style={{ display: "grid", gap: 8 }}>
-              {interacting.playlist.slice(0, 5).map((song, i) => {
-                const q = encodeURIComponent(song.replace(/—/g, "-").trim());
-                return (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, background: "rgba(255,255,255,0.04)", border: `1px solid ${R.accent}30`, padding: "10px 14px" }}>
-                    <span style={{ color: R.accent, fontWeight: 700, fontSize: 14, fontFamily: fontStack, width: 24 }}>{String(i + 1).padStart(2, "0")}</span>
-                    <span style={{ flex: 1, fontSize: 13, color: WHITE }}>{song}</span>
-                    <a href={`https://open.spotify.com/search/${q}`} target="_blank" rel="noopener noreferrer" className="chip up" style={{ fontSize: 8, color: WHITE, border: `1px solid ${LINE}`, padding: "5px 10px", textDecoration: "none", fontFamily: fontStack }}>Play on Spotify</a>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="up" style={{ fontSize: 8, color: DIM, marginTop: 10, letterSpacing: "0.1em" }}>Walk to the DJ booth to see your playlist · Walk away to close</div>
-          </div>
-        )}
+        {/* DJ Interaction — Spotify previews */}
+        {interacting?.type === "dj" && interacting.playlist?.length > 0 && <DJPanel playlist={interacting.playlist} accent={R.accent} />}
 
         {/* Chat */}
         <div style={{ display: "flex", gap: 8, padding: "12px 24px", borderTop: `1px solid ${LINE}` }}>
