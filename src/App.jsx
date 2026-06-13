@@ -1718,7 +1718,7 @@ export default function CosmicCloset() {
     const P = (x, y, w, h, fill) => <rect key={`${x}${y}${fill}`} x={x} y={y} width={w} height={h} fill={fill} />;
     function PxF({ children, vw, vh }) { return <svg viewBox={`0 0 ${vw} ${vh}`} style={{ width: "100%", height: "100%" }} xmlns="http://www.w3.org/2000/svg">{children}</svg>; }
 
-    function FCouch({ c = "#6A5ACD" }) { return <PxF vw={40} vh={24}>{P(1,20,3,4,"#2A2A2A")}{P(36,20,3,4,"#2A2A2A")}{P(0,8,40,12,c)}{P(0,4,5,16,c)}{P(35,4,5,16,c)}{P(5,2,30,6,"#"+Math.min(0xFFFFFF,parseInt(c.slice(1),16)+0x202020).toString(16))}{P(6,9,12,8,"#"+Math.max(0,parseInt(c.slice(1),16)-0x151515).toString(16))}{P(22,9,12,8,"#"+Math.max(0,parseInt(c.slice(1),16)-0x151515).toString(16))}{P(8,4,5,3,"#E06")}{P(27,4,5,3,"#4AF")}</PxF>; }
+    function FCouch({ c = "#6A5ACD" }) { const dk = "#"+Math.max(0,parseInt(c.slice(1),16)-0x151515).toString(16).padStart(6,"0"); const lt = "#"+Math.min(0xFFFFFF,parseInt(c.slice(1),16)+0x202020).toString(16).padStart(6,"0"); return <PxF vw={40} vh={24}>{P(1,20,3,4,"#2A2A2A")}{P(36,20,3,4,"#2A2A2A")}{P(0,8,40,12,c)}{P(0,4,5,16,c)}{P(35,4,5,16,c)}{P(5,2,30,6,lt)}{P(6,9,12,8,dk)}{P(22,9,12,8,dk)}{P(8,4,5,3,"#E06")}{P(27,4,5,3,"#4AF")}</PxF>; }
     function FTable() { return <PxF vw={32} vh={20}>{P(2,0,28,3,"#5A4A3A")}{P(2,0,28,1,"#7A6A5A")}{P(3,3,2,17,"#4A3A2A")}{P(27,3,2,17,"#4A3A2A")}{P(2,18,28,2,"#4A3A2A")}{P(10,1,4,1,"#333")}{P(18,1,4,1,"#333")}</PxF>; }
     function FRack() { return <PxF vw={32} vh={36}>{P(2,0,2,36,"#888")}{P(28,0,2,36,"#888")}{P(4,1,24,2,"#AAA")}{P(7,4,4,12,"#C9F24D")}{P(7,4,1,3,"#9AB830")}{P(13,4,4,16,"#E06")}{P(13,4,1,4,"#A04040")}{P(19,4,4,10,"#4AF")}{P(19,4,1,3,"#3080C0")}{P(25,4,3,14,"#FFA")}{P(25,4,1,3,"#CC8800")}</PxF>; }
     function FMirror() { return <PxF vw={16} vh={32}>{P(2,0,12,28,"#5A5A7A")}{P(3,1,10,26,"#3A3A5A")}{P(4,2,3,8,"rgba(255,255,255,0.08)")}{P(5,28,6,4,"#4A4A5A")}</PxF>; }
@@ -1935,7 +1935,7 @@ export default function CosmicCloset() {
 
             {/* Furniture */}
             {furniture.map((f, i) => (
-              <div key={`f${i}`} title={f.label} style={{ position: "absolute", left: `${(f.x / COLS) * 100}%`, top: `${(f.y / ROWS) * 100}%`, width: `${(f.w / COLS) * 100}%`, height: `${(f.h / ROWS) * 100}%`, pointerEvents: "none", zIndex: 4 + f.y, padding: "4%" }}>{f.comp}</div>
+              <div key={`f${i}`} style={{ position: "absolute", left: `${(f.x / COLS) * 100}%`, top: `${((f.y - (f.h > 1 ? 0 : 0.2)) / ROWS) * 100}%`, width: `${(f.w / COLS) * 100}%`, height: `${((f.h + 0.2) / ROWS) * 100}%`, pointerEvents: "none", zIndex: 4 + f.y, overflow: "visible" }}>{f.comp}</div>
             ))}
 
             {/* Players */}
@@ -1960,19 +1960,23 @@ export default function CosmicCloset() {
           </div>
         </div>
 
-        {/* DJ Interaction */}
+        {/* DJ Interaction — Spotify embed previews */}
         {interacting?.type === "dj" && interacting.playlist?.length > 0 && (
-          <div style={{ padding: "12px 24px", borderTop: `1px solid ${R.accent}`, background: "rgba(0,0,0,0.3)" }}>
-            <div className="up" style={{ fontSize: 10, color: R.accent, marginBottom: 10, letterSpacing: "0.16em" }}>🎧 DJ Booth — Your Playlist</div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {interacting.playlist.slice(0, 5).map((song, i) => (
-                <a key={i} href={`https://open.spotify.com/search/${encodeURIComponent(song.replace(/—/g, ""))}`} target="_blank" rel="noopener noreferrer"
-                  className="track" style={{ fontSize: 11, color: WHITE, background: "rgba(255,255,255,0.06)", border: `1px solid ${R.accent}40`, padding: "8px 12px", textDecoration: "none", fontFamily: fontStack, display: "flex", alignItems: "center", gap: 8, transition: "all .15s" }}>
-                  <span style={{ color: R.accent, fontWeight: 600 }}>{String(i + 1).padStart(2, "0")}</span> {song}
-                </a>
-              ))}
+          <div style={{ padding: "16px 24px", borderTop: `2px solid ${R.accent}`, background: "rgba(0,0,0,0.4)" }}>
+            <div className="up" style={{ fontSize: 11, color: R.accent, marginBottom: 12, letterSpacing: "0.16em" }}>🎧 DJ Booth — Your Playlist</div>
+            <div style={{ display: "grid", gap: 8 }}>
+              {interacting.playlist.slice(0, 5).map((song, i) => {
+                const q = encodeURIComponent(song.replace(/—/g, "-").trim());
+                return (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, background: "rgba(255,255,255,0.04)", border: `1px solid ${R.accent}30`, padding: "10px 14px" }}>
+                    <span style={{ color: R.accent, fontWeight: 700, fontSize: 14, fontFamily: fontStack, width: 24 }}>{String(i + 1).padStart(2, "0")}</span>
+                    <span style={{ flex: 1, fontSize: 13, color: WHITE }}>{song}</span>
+                    <a href={`https://open.spotify.com/search/${q}`} target="_blank" rel="noopener noreferrer" className="chip up" style={{ fontSize: 8, color: WHITE, border: `1px solid ${LINE}`, padding: "5px 10px", textDecoration: "none", fontFamily: fontStack }}>Play on Spotify</a>
+                  </div>
+                );
+              })}
             </div>
-            <div className="up" style={{ fontSize: 8, color: GREY, marginTop: 8, letterSpacing: "0.1em" }}>Tap a track to play it on Spotify</div>
+            <div className="up" style={{ fontSize: 8, color: DIM, marginTop: 10, letterSpacing: "0.1em" }}>Walk to the DJ booth to see your playlist · Walk away to close</div>
           </div>
         )}
 
