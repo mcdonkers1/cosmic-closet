@@ -1694,7 +1694,7 @@ export default function CosmicCloset() {
 
   // ---------- Cosmic World — multiplayer room ----------
   function CosmicWorld() {
-    const COLS = 12, ROWS = 8;
+    const COLS = 10, ROWS = 8;
     const [myPos, setMyPos] = useState({ x: Math.floor(Math.random() * COLS), y: Math.floor(Math.random() * ROWS) });
     const [others, setOthers] = useState({});
     const [chatMsg, setChatMsg] = useState("");
@@ -1817,57 +1817,86 @@ export default function CosmicCloset() {
           <span style={{ color: GREY, fontSize: 10, marginLeft: 12 }}>{allPlayers.length} online</span>
         </div>
 
-        {/* Room */}
-        <div ref={worldRef} onClick={handleTap} style={{ position: "relative", width: "100%", maxWidth: 760, margin: "0 auto", aspectRatio: `${COLS}/${ROWS}`, overflow: "hidden", cursor: "crosshair", touchAction: "none" }}>
-          {/* Wall */}
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "15%", background: "linear-gradient(180deg, #1A1A2E 0%, #16213E 100%)", borderBottom: "3px solid #0F3460" }}>
-            {/* Wall decorations */}
-            <div style={{ position: "absolute", left: "8%", top: "20%", width: "12%", height: "60%", border: "2px solid #2A2A4A", background: "#0D0D1A", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(10px, 2vw, 18px)" }}>🌙</div>
-            <div style={{ position: "absolute", left: "38%", top: "15%", width: "24%", height: "70%", border: "2px solid #2A2A4A", background: "#0D0D1A", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(10px, 2vw, 18px)" }}>✦ ✦ ✦</div>
-            <div style={{ position: "absolute", right: "8%", top: "20%", width: "12%", height: "60%", border: "2px solid #2A2A4A", background: "#0D0D1A", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(10px, 2vw, 18px)" }}>🪞</div>
-          </div>
-
-          {/* Floor */}
-          <div style={{ position: "absolute", top: "15%", left: 0, right: 0, bottom: 0, background: "repeating-conic-gradient(#141420 0% 25%, #111118 0% 50%) 0 0 / calc(100% / ${COLS} * 2) calc(100% / ${ROWS} * 2)", backgroundSize: `${200 / COLS}% ${200 / (ROWS * 0.85)}%` }} />
-
-          {/* Floor grid overlay */}
-          <div style={{ position: "absolute", top: "15%", left: 0, right: 0, bottom: 0 }}>
-            {[...Array(COLS + 1)].map((_, i) => <div key={`v${i}`} style={{ position: "absolute", left: `${(i / COLS) * 100}%`, top: 0, bottom: 0, width: 1, background: "rgba(244,244,240,0.03)" }} />)}
-            {[...Array(ROWS)].map((_, i) => <div key={`h${i}`} style={{ position: "absolute", top: `${(i / (ROWS * 0.85)) * 100}%`, left: 0, right: 0, height: 1, background: "rgba(244,244,240,0.03)" }} />)}
-          </div>
-
-          {/* Furniture */}
-          {[[0, 1, "🛋️", 2, 1], [10, 1, "🪴", 1, 1], [5, 3, "☕", 1, 1], [11, 6, "💡", 1, 1], [0, 6, "🎵", 1, 1], [3, 6, "📚", 1, 1], [8, 1, "🖥️", 1, 1]].map(([fx, fy, emoji, fw, fh], i) => (
-            <div key={`f${i}`} style={{ position: "absolute", left: `${(fx / COLS) * 100}%`, top: `${(15 + (fy / ROWS) * 85)}%`, width: `${(fw / COLS) * 100}%`, height: `${(fh / ROWS) * 85}%`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(16px, 3vw, 28px)", pointerEvents: "none", opacity: 0.7, zIndex: 5 + fy }}>{emoji}</div>
-          ))}
-
-          {/* Players */}
-          {allPlayers.map(p => {
-            const bubble = chatBubbles[p.uid];
-            const pxLeft = `${(p.x / COLS) * 100}%`;
-            const pxTop = `${(15 + (p.y / ROWS) * 85)}%`;
-            const tileW = `${100 / COLS}%`;
-            const tileH = `${85 / ROWS}%`;
-            return (
-              <div key={p.uid} style={{ position: "absolute", left: pxLeft, top: pxTop, width: tileW, height: tileH, transition: "left 0.18s ease, top 0.18s ease", zIndex: 10 + p.y }}>
-                {/* Chat bubble */}
-                {bubble && (
-                  <div style={{ position: "absolute", bottom: "105%", left: "50%", transform: "translateX(-50%)", background: WHITE, color: BLACK, padding: "4px 8px", fontSize: "clamp(8px, 1.3vw, 11px)", borderRadius: 8, maxWidth: 140, textAlign: "center", lineHeight: 1.4, whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: fontStack, pointerEvents: "none", zIndex: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>
-                    {bubble.text}
-                    <div style={{ position: "absolute", bottom: -5, left: "50%", transform: "translateX(-50%)", width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: `5px solid ${WHITE}` }} />
-                  </div>
-                )}
-                {/* Name tag */}
-                <div style={{ position: "absolute", top: -16, left: "50%", transform: "translateX(-50%)", fontSize: "clamp(7px, 1.1vw, 9px)", color: p.isMe ? ACCENT : "#AAA", textTransform: "uppercase", letterSpacing: "0.1em", whiteSpace: "nowrap", pointerEvents: "none", fontFamily: fontStack, fontWeight: p.isMe ? 600 : 400, textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>{p.name}</div>
-                {/* Shadow */}
-                <div style={{ position: "absolute", bottom: 0, left: "20%", width: "60%", height: "12%", background: "rgba(0,0,0,0.3)", borderRadius: "50%" }} />
-                {/* Character */}
-                <div style={{ position: "absolute", inset: "5% 10% 8%", overflow: "hidden" }}>
-                  <PixelAvatar a={p.avatar || myAvatar} prefs={p.prefs || avatarPrefs} facing={p.facing || "front"} sex={p.sex || sex} age={parseInt(p.age || age, 10) || null} />
-                </div>
+        {/* Room — full width, tall */}
+        <div ref={worldRef} onClick={handleTap} style={{ position: "relative", width: "100%", height: "max(70vh, 500px)", overflow: "hidden", cursor: "crosshair", touchAction: "none", background: "#1E1E2A" }}>
+          {/* Wall — top 18% */}
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "18%", background: "linear-gradient(180deg, #2D2B55 0%, #1E1B4B 60%, #1A1840 100%)" }}>
+            {/* Baseboard */}
+            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 4, background: "#3D3A6A" }} />
+            {/* Window */}
+            <div style={{ position: "absolute", left: "5%", top: "12%", width: "18%", height: "75%", background: "linear-gradient(180deg, #1a1a3a 0%, #2a2a5a 100%)", border: "3px solid #4A4680", borderRadius: 4, overflow: "hidden" }}>
+              <div style={{ position: "absolute", inset: 3, background: "linear-gradient(180deg, #0D0B2E 0%, #1A1840 50%, #2D2860 100%)" }}>
+                <div style={{ position: "absolute", top: "15%", left: "20%", width: 4, height: 4, background: "#C9F24D", borderRadius: "50%", boxShadow: "0 0 6px #C9F24D" }} />
+                <div style={{ position: "absolute", top: "25%", right: "30%", width: 3, height: 3, background: "#F4F4F0", borderRadius: "50%", opacity: 0.5 }} />
+                <div style={{ position: "absolute", top: "40%", left: "50%", width: 2, height: 2, background: "#F4F4F0", borderRadius: "50%", opacity: 0.3 }} />
               </div>
-            );
-          })}
+              <div style={{ position: "absolute", top: 0, bottom: 0, left: "50%", width: 2, background: "#4A4680" }} />
+              <div style={{ position: "absolute", left: 0, right: 0, top: "50%", height: 2, background: "#4A4680" }} />
+            </div>
+            {/* Poster */}
+            <div style={{ position: "absolute", left: "32%", top: "10%", width: "14%", height: "72%", background: "#0D0D1A", border: "2px solid #3A3860", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontSize: "clamp(16px, 2.5vw, 28px)" }}>✦</span>
+            </div>
+            {/* Shelf */}
+            <div style={{ position: "absolute", left: "55%", top: "30%", width: "20%", height: 3, background: "#4A4680" }}>
+              <div style={{ position: "absolute", top: -14, left: "10%", fontSize: "clamp(10px, 1.5vw, 16px)" }}>🪴</div>
+              <div style={{ position: "absolute", top: -12, right: "15%", fontSize: "clamp(8px, 1.2vw, 14px)" }}>📚</div>
+            </div>
+            {/* Clock */}
+            <div style={{ position: "absolute", right: "8%", top: "15%", width: "8%", aspectRatio: "1", borderRadius: "50%", border: "2px solid #4A4680", background: "#0D0D1A", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(8px, 1.2vw, 14px)", color: ACCENT }}>⏰</div>
+          </div>
+
+          {/* Floor — bottom 82% */}
+          <div style={{ position: "absolute", top: "18%", left: 0, right: 0, bottom: 0, overflow: "hidden" }}>
+            {/* Checkerboard floor */}
+            {[...Array(COLS * ROWS)].map((_, i) => {
+              const col = i % COLS, row = Math.floor(i / COLS);
+              const dark = (col + row) % 2 === 0;
+              return <div key={i} style={{ position: "absolute", left: `${(col / COLS) * 100}%`, top: `${(row / ROWS) * 100}%`, width: `${100 / COLS}%`, height: `${100 / ROWS}%`, background: dark ? "#1C1C2E" : "#222238", borderRight: "1px solid rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.03)" }} />;
+            })}
+
+            {/* Rug */}
+            <div style={{ position: "absolute", left: `${(3 / COLS) * 100}%`, top: `${(2 / ROWS) * 100}%`, width: `${(4 / COLS) * 100}%`, height: `${(3 / ROWS) * 100}%`, background: "rgba(201,242,77,0.06)", border: `1px solid rgba(201,242,77,0.12)`, borderRadius: 4, pointerEvents: "none", zIndex: 1 }} />
+
+            {/* Furniture on floor */}
+            {[
+              [0, 0, "🛋️", "clamp(28px, 5vw, 48px)"],
+              [1, 0, "🛋️", "clamp(28px, 5vw, 48px)"],
+              [9, 0, "🪴", "clamp(24px, 4vw, 40px)"],
+              [0, 7, "🎵", "clamp(24px, 4vw, 40px)"],
+              [9, 7, "💡", "clamp(24px, 4vw, 40px)"],
+              [4, 1, "☕", "clamp(20px, 3vw, 32px)"],
+              [5, 1, "🍕", "clamp(20px, 3vw, 32px)"],
+              [8, 3, "🖥️", "clamp(24px, 4vw, 40px)"],
+              [8, 4, "🪑", "clamp(20px, 3vw, 32px)"],
+            ].map(([fx, fy, emoji, sz], i) => (
+              <div key={`f${i}`} style={{ position: "absolute", left: `${(fx / COLS) * 100}%`, top: `${(fy / ROWS) * 100}%`, width: `${100 / COLS}%`, height: `${100 / ROWS}%`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: sz, pointerEvents: "none", zIndex: 4 + fy, filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.4))" }}>{emoji}</div>
+            ))}
+
+            {/* Players */}
+            {allPlayers.map(p => {
+              const bubble = chatBubbles[p.uid];
+              return (
+                <div key={p.uid} style={{ position: "absolute", left: `${(p.x / COLS) * 100}%`, top: `${(p.y / ROWS) * 100}%`, width: `${100 / COLS}%`, height: `${100 / ROWS}%`, transition: "left 0.18s ease, top 0.18s ease", zIndex: 10 + p.y }}>
+                  {/* Chat bubble */}
+                  {bubble && (
+                    <div style={{ position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)", background: WHITE, color: BLACK, padding: "6px 10px", fontSize: 11, borderRadius: 10, maxWidth: 160, textAlign: "center", lineHeight: 1.4, whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: fontStack, pointerEvents: "none", zIndex: 100, boxShadow: "0 4px 12px rgba(0,0,0,0.5)", marginBottom: 4 }}>
+                      {bubble.text}
+                      <div style={{ position: "absolute", bottom: -6, left: "50%", transform: "translateX(-50%)", width: 0, height: 0, borderLeft: "6px solid transparent", borderRight: "6px solid transparent", borderTop: `6px solid ${WHITE}` }} />
+                    </div>
+                  )}
+                  {/* Name tag */}
+                  <div style={{ position: "absolute", top: -18, left: "50%", transform: "translateX(-50%)", fontSize: 9, color: p.isMe ? BLACK : WHITE, background: p.isMe ? ACCENT : "rgba(0,0,0,0.6)", padding: "2px 6px", borderRadius: 3, textTransform: "uppercase", letterSpacing: "0.1em", whiteSpace: "nowrap", pointerEvents: "none", fontFamily: fontStack, fontWeight: 600 }}>{p.name}</div>
+                  {/* Shadow */}
+                  <div style={{ position: "absolute", bottom: "2%", left: "15%", width: "70%", height: "10%", background: "rgba(0,0,0,0.35)", borderRadius: "50%", filter: "blur(2px)" }} />
+                  {/* Character */}
+                  <div style={{ position: "absolute", top: "-30%", left: "5%", right: "5%", bottom: "5%", overflow: "hidden" }}>
+                    <PixelAvatar a={p.avatar || myAvatar} prefs={{ ...(p.prefs || avatarPrefs), scene: "void" }} facing={p.facing || "front"} sex={p.sex || sex} age={parseInt(p.age || age, 10) || null} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* Chat input */}
