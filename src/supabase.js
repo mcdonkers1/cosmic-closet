@@ -124,6 +124,70 @@ export async function getMyShare(userId, date) {
   return data;
 }
 
+// ---- Search users ----
+export async function searchUsers(query) {
+  if (!supabase || !query.trim()) return [];
+  const { data, error } = await supabase
+    .from("shared_days")
+    .select("user_id, display_name, sign_name, sign_symbol")
+    .ilike("display_name", `%${query.trim()}%`)
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (error) throw error;
+  // dedupe by user_id
+  const seen = new Set();
+  return (data || []).filter(r => { if (seen.has(r.user_id)) return false; seen.add(r.user_id); return true; });
+}
+export async function getUserFeed(userId) {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("shared_days")
+    .select("*")
+    .eq("user_id", userId)
+    .order("date", { ascending: false })
+    .limit(30);
+  if (error) throw error;
+  return data || [];
+}
+
+// ---- Likes ----
+export async function toggleLike(userId, sharedDayId) {
+  if (!supabase) return;
+  const { data: existing } = await supabase.from("feed_likes").select("id").eq("user_id", userId).eq("shared_day_id", sharedDayId).maybeSingle();
+  if (existing) {
+    await supabase.from("feed_likes").delete().eq("id", existing.id);
+    return false;
+  } else {
+    await supabase.from("feed_likes").insert({ user_id: userId, shared_day_id: sharedDayId });
+    return true;
+  }
+}
+export async function getLikes(sharedDayIds) {
+  if (!supabase || !sharedDayIds.length) return {};
+  const { data, error } = await supabase.from("feed_likes").select("shared_day_id, user_id").in("shared_day_id", sharedDayIds);
+  if (error) throw error;
+  const map = {};
+  for (const r of (data || [])) {
+    if (!map[r.shared_day_id]) map[r.shared_day_id] = [];
+    map[r.shared_day_id].push(r.user_id);
+  }
+  return map;
+}
+
+// ---- Comments ----
+export async function addComment(userId, sharedDayId, displayName, body) {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from("feed_comments").insert({ user_id: userId, shared_day_id: sharedDayId, display_name: displayName, body }).select().maybeSingle();
+  if (error) throw error;
+  return data;
+}
+export async function getComments(sharedDayId) {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from("feed_comments").select("*").eq("shared_day_id", sharedDayId).order("created_at", { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
 // Compute current streak (consecutive days up to today with wore=true).
 export function computeStreak(log) {
   const wore = new Set(log.filter((r) => r.wore).map((r) => r.date));

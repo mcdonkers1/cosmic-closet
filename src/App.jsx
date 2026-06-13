@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import Auth from "./Auth.jsx";
-import { supabaseReady, getSession, onAuthChange, getProfile, upsertProfile, getFitLog, upsertFitDay, computeStreak, signOut, shareDay, getFeed, getMyShare } from "./supabase.js";
+import { supabaseReady, getSession, onAuthChange, getProfile, upsertProfile, getFitLog, upsertFitDay, computeStreak, signOut, shareDay, getFeed, getMyShare, searchUsers, getUserFeed, toggleLike, getLikes, addComment, getComments } from "./supabase.js";
 
 const SIGNS = [
   { name: "Aries", symbol: "♈︎", dates: "Mar 21 – Apr 19", element: "Fire", vibe: "bold, structured, energetic" },
@@ -1692,53 +1692,143 @@ export default function CosmicCloset() {
     const [feedLoading, setFeedLoading] = useState(true);
     const [shared, setShared] = useState(false);
     const [sharing, setSharing] = useState(false);
+    const [likesMap, setLikesMap] = useState({});
+    const [openComments, setOpenComments] = useState(null);
+    const [comments, setComments] = useState([]);
+    const [commentText, setCommentText] = useState("");
+    const [sendingComment, setSendingComment] = useState(false);
+    const [searchQ, setSearchQ] = useState("");
+    const [searchResults, setSearchResults] = useState([]);
+    const [searching, setSearching] = useState(false);
+    const [viewUser, setViewUser] = useState(null);
+    const [viewUserFeed, setViewUserFeed] = useState([]);
     const up = { textTransform: "uppercase", letterSpacing: "0.18em" };
     const btn = { border: `1px solid ${LINE}`, background: "transparent", color: WHITE, fontFamily: fontStack, cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.12em" };
+    const fld = { width: "100%", background: "transparent", border: `1px solid ${LINE}`, color: WHITE, padding: 12, fontSize: 12, fontFamily: fontStack, letterSpacing: "0.06em" };
 
-    useEffect(() => {
-      (async () => {
-        setFeedLoading(true);
-        const items = await getFeed(todayKey());
-        setFeed(items);
-        if (user) {
-          const mine = items.find(i => i.user_id === user.id);
-          if (mine) setShared(true);
-        }
-        setFeedLoading(false);
-      })();
-    }, [user]);
+    async function loadFeed() {
+      setFeedLoading(true);
+      const items = await getFeed(todayKey());
+      setFeed(items);
+      if (user) { const mine = items.find(i => i.user_id === user.id); if (mine) setShared(true); }
+      if (items.length > 0) {
+        const lm = await getLikes(items.map(i => i.id));
+        setLikesMap(lm);
+      }
+      setFeedLoading(false);
+    }
+
+    useEffect(() => { if (!viewUser) loadFeed(); }, [user, viewUser]);
 
     async function handleShare() {
       if (!user) { setAuthPrompt(true); return; }
       if (!sign || !reading) return;
       setSharing(true);
       try {
-        const s = SIGNS.find(x => x.name === sign.name);
         await shareDay(user.id, {
           date: todayKey(),
           display_name: displayName || user.email?.split("@")[0] || "Anonymous",
-          sign_name: sign.name,
-          sign_symbol: sign.symbol,
-          fit_name: reading.fitName || "",
-          fit: reading.fit || "",
-          mood: reading.mood || "",
-          activity: reading.activity || "",
+          sign_name: sign.name, sign_symbol: sign.symbol,
+          fit_name: reading.fitName || "", fit: reading.fit || "",
+          mood: reading.mood || "", activity: reading.activity || "",
           playlist: reading.playlist || [],
-          avatar: deriveAvatar(reading, sign),
-          prefs: { ...avatarPrefs },
+          avatar: deriveAvatar(reading, sign), prefs: { ...avatarPrefs },
         });
         setShared(true);
-        const items = await getFeed(todayKey());
-        setFeed(items);
+        await loadFeed();
       } catch (e) { console.error(e); }
       setSharing(false);
     }
 
+    async function handleLike(itemId) {
+      if (!user) { setAuthPrompt(true); return; }
+      const liked = await toggleLike(user.id, itemId);
+      setLikesMap(prev => {
+        const arr = [...(prev[itemId] || [])];
+        if (liked) arr.push(user.id); else { const idx = arr.indexOf(user.id); if (idx >= 0) arr.splice(idx, 1); }
+        return { ...prev, [itemId]: arr };
+      });
+    }
+
+    async function handleOpenComments(itemId) {
+      if (openComments === itemId) { setOpenComments(null); return; }
+      setOpenComments(itemId);
+      setComments(await getComments(itemId));
+      setCommentText("");
+    }
+
+    async function handleSendComment(itemId) {
+      if (!user) { setAuthPrompt(true); return; }
+      if (!commentText.trim()) return;
+      setSendingComment(true);
+      await addComment(user.id, itemId, displayName || user.email?.split("@")[0] || "Anonymous", commentText.trim());
+      setComments(await getComments(itemId));
+      setCommentText("");
+      setSendingComment(false);
+    }
+
+    async function handleSearch() {
+      if (!searchQ.trim()) { setSearchResults([]); return; }
+      setSearching(true);
+      setSearchResults(await searchUsers(searchQ));
+      setSearching(false);
+    }
+
+    async function handleViewUser(u) {
+      setViewUser(u);
+      setViewUserFeed(await getUserFeed(u.user_id));
+    }
+
+    // ---------- User profile view ----------
+    if (viewUser) {
+      return (
+        <main style={{ maxWidth: 760, margin: "0 auto", position: "relative", zIndex: 1, padding: "0 24px 80px" }}>
+          <section style={{ padding: "28px 0", borderBottom: `1px solid ${LINE}` }}>
+            <button className="up" onClick={() => setViewUser(null)} style={{ ...btn, padding: "8px 14px", fontSize: 9, marginBottom: 20 }}>← Back to feed</button>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: "50%", background: LINE, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{viewUser.sign_symbol}</div>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 500 }}>{viewUser.display_name}</div>
+                <div className="up" style={{ fontSize: 9, color: GREY }}>{viewUser.sign_name}</div>
+              </div>
+            </div>
+          </section>
+          {viewUserFeed.length === 0 ? (
+            <div style={{ padding: "40px 0", textAlign: "center" }}>
+              <p className="up" style={{ color: DIM, fontSize: 10 }}>No shared fits yet.</p>
+            </div>
+          ) : viewUserFeed.map((item, idx) => (
+            <FeedCard key={item.id || idx} item={item} isMe={false} showDate />
+          ))}
+        </main>
+      );
+    }
+
+    // ---------- Main feed ----------
     return (
       <main style={{ maxWidth: 760, margin: "0 auto", position: "relative", zIndex: 1, padding: "0 24px 80px" }}>
-        {/* Share your day */}
-        <section style={{ padding: "28px 0", borderBottom: `1px solid ${LINE}`, textAlign: "center" }}>
-          <div className="up" style={{ fontSize: 10, color: GREY, marginBottom: 16 }}>Today's feed</div>
+        {/* Search */}
+        <section style={{ padding: "20px 0", borderBottom: `1px solid ${LINE}` }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input style={fld} value={searchQ} onChange={e => setSearchQ(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleSearch(); }} placeholder="SEARCH USERS…" className="up" />
+            <button className="up" onClick={handleSearch} disabled={searching} style={{ ...btn, padding: "0 16px", fontSize: 9, whiteSpace: "nowrap" }}>{searching ? "…" : "Search"}</button>
+          </div>
+          {searchResults.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              {searchResults.map((r, i) => (
+                <button key={i} onClick={() => handleViewUser(r)} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", background: "transparent", border: "none", borderBottom: `1px solid ${LINE}`, padding: "10px 4px", cursor: "pointer", fontFamily: fontStack, color: WHITE, textAlign: "left" }}>
+                  <span style={{ fontSize: 16 }}>{r.sign_symbol}</span>
+                  <span style={{ fontSize: 12 }}>{r.display_name}</span>
+                  <span className="up" style={{ fontSize: 8, color: GREY, marginLeft: "auto" }}>{r.sign_name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Share */}
+        <section style={{ padding: "20px 0", borderBottom: `1px solid ${LINE}`, textAlign: "center" }}>
+          <div className="up" style={{ fontSize: 10, color: GREY, marginBottom: 12 }}>Today's feed</div>
           {sign && reading ? (
             <button className="up" onClick={handleShare} disabled={shared || sharing}
               style={{ background: shared ? "transparent" : ACCENT, color: shared ? ACCENT : BLACK, border: `1px solid ${shared ? ACCENT : "transparent"}`, padding: "13px 24px", fontSize: 10, letterSpacing: "0.14em", fontFamily: fontStack, cursor: shared ? "default" : "pointer", fontWeight: 600 }}>
@@ -1760,59 +1850,79 @@ export default function CosmicCloset() {
             <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.4 }}>✦</div>
             <p className="up" style={{ color: DIM, fontSize: 10, lineHeight: 2 }}>No one has shared yet today.<br />Be the first.</p>
           </div>
-        ) : (
-          <div style={{ display: "grid", gap: 0 }}>
-            {feed.map((item, idx) => {
-              const isMe = user && item.user_id === user.id;
-              return (
-                <div key={item.id || idx} style={{ padding: "24px 0", borderBottom: `1px solid ${LINE}` }}>
-                  {/* User header */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: LINE, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>{item.sign_symbol}</div>
-                    <div>
-                      <div style={{ fontSize: 12, fontWeight: 500 }}>{item.display_name}{isMe && <span style={{ color: ACCENT, fontSize: 9, marginLeft: 6 }}>YOU</span>}</div>
-                      <div className="up" style={{ fontSize: 8, color: GREY }}>{item.sign_name}</div>
-                    </div>
-                  </div>
-                  {/* Fit */}
-                  <div style={{ marginBottom: 12 }}>
-                    {item.fit_name && <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{item.fit_name}</div>}
-                    <div style={{ fontSize: 12, color: GREY, lineHeight: 1.7 }}>{item.fit}</div>
-                  </div>
-                  {/* Mood + activity */}
-                  <div style={{ display: "flex", gap: 20, marginBottom: 14, flexWrap: "wrap" }}>
-                    {item.mood && (
-                      <div>
-                        <div className="up" style={{ fontSize: 8, color: GREY, marginBottom: 2 }}>Mood</div>
-                        <div style={{ fontSize: 12, fontStyle: "italic" }}>{item.mood}</div>
-                      </div>
-                    )}
-                    {item.activity && (
-                      <div style={{ flex: 1, minWidth: 140 }}>
-                        <div className="up" style={{ fontSize: 8, color: ACCENT, marginBottom: 2 }}>Do this</div>
-                        <div style={{ fontSize: 12, lineHeight: 1.5 }}>{item.activity}</div>
-                      </div>
-                    )}
-                  </div>
-                  {/* Playlist */}
-                  {item.playlist?.length > 0 && (
-                    <div>
-                      <div className="up" style={{ fontSize: 8, color: GREY, marginBottom: 6 }}>Soundtrack</div>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        {item.playlist.slice(0, 5).map((song, i) => (
-                          <a key={i} href={`https://open.spotify.com/search/${encodeURIComponent(song.replace(/—/g, ""))}`} target="_blank" rel="noopener noreferrer"
-                            style={{ fontSize: 10, color: WHITE, background: "rgba(244,244,240,0.04)", border: `1px solid ${LINE}`, padding: "5px 9px", textDecoration: "none", fontFamily: fontStack, letterSpacing: "0.02em" }}>{song}</a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+        ) : feed.map((item, idx) => (
+          <FeedCard key={item.id || idx} item={item} isMe={user && item.user_id === user.id} />
+        ))}
       </main>
     );
+
+    function FeedCard({ item, isMe, showDate }) {
+      const likeArr = likesMap[item.id] || [];
+      const iLiked = user && likeArr.includes(user.id);
+      const isOpen = openComments === item.id;
+      return (
+        <div style={{ padding: "24px 0", borderBottom: `1px solid ${LINE}` }}>
+          {/* User header */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <button onClick={() => handleViewUser({ user_id: item.user_id, display_name: item.display_name, sign_name: item.sign_name, sign_symbol: item.sign_symbol })} style={{ width: 28, height: 28, borderRadius: "50%", background: LINE, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, border: "none", cursor: "pointer", padding: 0 }}>{item.sign_symbol}</button>
+            <div style={{ flex: 1 }}>
+              <button onClick={() => handleViewUser({ user_id: item.user_id, display_name: item.display_name, sign_name: item.sign_name, sign_symbol: item.sign_symbol })} style={{ background: "none", border: "none", color: WHITE, fontSize: 12, fontWeight: 500, cursor: "pointer", padding: 0, fontFamily: fontStack }}>
+                {item.display_name}{isMe && <span style={{ color: ACCENT, fontSize: 9, marginLeft: 6 }}>YOU</span>}
+              </button>
+              <div className="up" style={{ fontSize: 8, color: GREY }}>{item.sign_name}{showDate && ` · ${item.date}`}</div>
+            </div>
+          </div>
+          {/* Fit */}
+          <div style={{ marginBottom: 12 }}>
+            {item.fit_name && <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{item.fit_name}</div>}
+            <div style={{ fontSize: 12, color: GREY, lineHeight: 1.7 }}>{item.fit}</div>
+          </div>
+          {/* Mood + activity */}
+          <div style={{ display: "flex", gap: 20, marginBottom: 14, flexWrap: "wrap" }}>
+            {item.mood && <div><div className="up" style={{ fontSize: 8, color: GREY, marginBottom: 2 }}>Mood</div><div style={{ fontSize: 12, fontStyle: "italic" }}>{item.mood}</div></div>}
+            {item.activity && <div style={{ flex: 1, minWidth: 140 }}><div className="up" style={{ fontSize: 8, color: ACCENT, marginBottom: 2 }}>Do this</div><div style={{ fontSize: 12, lineHeight: 1.5 }}>{item.activity}</div></div>}
+          </div>
+          {/* Playlist */}
+          {item.playlist?.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <div className="up" style={{ fontSize: 8, color: GREY, marginBottom: 6 }}>Soundtrack</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {item.playlist.slice(0, 5).map((song, i) => (
+                  <a key={i} href={`https://open.spotify.com/search/${encodeURIComponent(song.replace(/—/g, ""))}`} target="_blank" rel="noopener noreferrer"
+                    style={{ fontSize: 10, color: WHITE, background: "rgba(244,244,240,0.04)", border: `1px solid ${LINE}`, padding: "5px 9px", textDecoration: "none", fontFamily: fontStack, letterSpacing: "0.02em" }}>{song}</a>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Like + Comment buttons */}
+          <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+            <button onClick={() => handleLike(item.id)} style={{ background: "none", border: "none", color: iLiked ? ACCENT : GREY, fontSize: 12, cursor: "pointer", fontFamily: fontStack, padding: 0, display: "flex", alignItems: "center", gap: 5 }}>
+              {iLiked ? "♥" : "♡"} <span style={{ fontSize: 10 }}>{likeArr.length || ""}</span>
+            </button>
+            <button onClick={() => handleOpenComments(item.id)} style={{ background: "none", border: "none", color: isOpen ? WHITE : GREY, fontSize: 10, cursor: "pointer", fontFamily: fontStack, padding: 0, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+              Comments
+            </button>
+          </div>
+          {/* Comments section */}
+          {isOpen && (
+            <div style={{ marginTop: 14, paddingLeft: 12, borderLeft: `2px solid ${LINE}` }}>
+              {comments.length === 0 && <p className="up" style={{ fontSize: 9, color: DIM }}>No comments yet.</p>}
+              {comments.map((c, ci) => (
+                <div key={c.id || ci} style={{ marginBottom: 10 }}>
+                  <span style={{ fontSize: 11, fontWeight: 500 }}>{c.display_name}</span>
+                  <span style={{ fontSize: 10, color: GREY, marginLeft: 8 }}>{new Date(c.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                  <div style={{ fontSize: 12, color: WHITE, marginTop: 2, lineHeight: 1.5 }}>{c.body}</div>
+                </div>
+              ))}
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                <input style={{ ...fld, flex: 1, padding: 10, fontSize: 11 }} value={commentText} onChange={e => setCommentText(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleSendComment(item.id); }} placeholder="Say something…" />
+                <button className="up" onClick={() => handleSendComment(item.id)} disabled={sendingComment} style={{ ...btn, padding: "0 14px", fontSize: 9 }}>{sendingComment ? "…" : "Send"}</button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
   }
 
   // ---------- Profile + fit calendar ----------
