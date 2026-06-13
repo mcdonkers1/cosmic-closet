@@ -1694,9 +1694,7 @@ export default function CosmicCloset() {
 
   // ---------- Cosmic World — multiplayer room ----------
   function CosmicWorld() {
-    const TILE = 40;
-    const COLS = 16, ROWS = 10;
-    const W = COLS * TILE, H = ROWS * TILE;
+    const COLS = 12, ROWS = 8;
     const [myPos, setMyPos] = useState({ x: Math.floor(Math.random() * COLS), y: Math.floor(Math.random() * ROWS) });
     const [others, setOthers] = useState({});
     const [chatMsg, setChatMsg] = useState("");
@@ -1707,7 +1705,7 @@ export default function CosmicCloset() {
     const worldRef = useRef(null);
 
     const myName = displayName || user?.email?.split("@")[0] || "Anon";
-    const myAvatar = reading && sign ? deriveAvatar(reading, sign) : { top: "tee", topColor: "#333", bottom: "jeans", bottomColor: "#234", shoes: "sneakers", shoeColor: "#222" };
+    const myAvatar = reading && sign ? deriveAvatar(reading, sign) : { top: "tee", topColor: "#444", bottom: "jeans", bottomColor: "#2A3A5A", shoes: "sneakers", shoeColor: "#222" };
 
     // Supabase Realtime presence
     useEffect(() => {
@@ -1820,35 +1818,52 @@ export default function CosmicCloset() {
         </div>
 
         {/* Room */}
-        <div ref={worldRef} onClick={handleTap} style={{ position: "relative", width: "100%", maxWidth: 760, margin: "0 auto", aspectRatio: `${COLS}/${ROWS}`, background: "#0A0A0E", border: `1px solid ${LINE}`, overflow: "hidden", cursor: "crosshair", touchAction: "none" }}>
-          {/* Grid */}
-          <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-            {[...Array(COLS + 1)].map((_, i) => <line key={`v${i}`} x1={i * TILE} y1={0} x2={i * TILE} y2={H} stroke="rgba(244,244,240,0.04)" strokeWidth="0.5" />)}
-            {[...Array(ROWS + 1)].map((_, i) => <line key={`h${i}`} x1={0} y1={i * TILE} x2={W} y2={i * TILE} stroke="rgba(244,244,240,0.04)" strokeWidth="0.5" />)}
-          </svg>
+        <div ref={worldRef} onClick={handleTap} style={{ position: "relative", width: "100%", maxWidth: 760, margin: "0 auto", aspectRatio: `${COLS}/${ROWS}`, overflow: "hidden", cursor: "crosshair", touchAction: "none" }}>
+          {/* Wall */}
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "15%", background: "linear-gradient(180deg, #1A1A2E 0%, #16213E 100%)", borderBottom: "3px solid #0F3460" }}>
+            {/* Wall decorations */}
+            <div style={{ position: "absolute", left: "8%", top: "20%", width: "12%", height: "60%", border: "2px solid #2A2A4A", background: "#0D0D1A", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(10px, 2vw, 18px)" }}>🌙</div>
+            <div style={{ position: "absolute", left: "38%", top: "15%", width: "24%", height: "70%", border: "2px solid #2A2A4A", background: "#0D0D1A", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(10px, 2vw, 18px)" }}>✦ ✦ ✦</div>
+            <div style={{ position: "absolute", right: "8%", top: "20%", width: "12%", height: "60%", border: "2px solid #2A2A4A", background: "#0D0D1A", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(10px, 2vw, 18px)" }}>🪞</div>
+          </div>
 
-          {/* Furniture — simple decorations */}
-          {[[2, 1, "🪴"], [12, 2, "🛋️"], [7, 0, "🖼️"], [14, 8, "💡"], [0, 8, "🎵"], [5, 5, "⭐"]].map(([fx, fy, emoji], i) => (
-            <div key={`f${i}`} style={{ position: "absolute", left: `${(fx / COLS) * 100}%`, top: `${(fy / ROWS) * 100}%`, width: `${100 / COLS}%`, height: `${100 / ROWS}%`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(14px, 2.5vw, 24px)", pointerEvents: "none", opacity: 0.5 }}>{emoji}</div>
+          {/* Floor */}
+          <div style={{ position: "absolute", top: "15%", left: 0, right: 0, bottom: 0, background: "repeating-conic-gradient(#141420 0% 25%, #111118 0% 50%) 0 0 / calc(100% / ${COLS} * 2) calc(100% / ${ROWS} * 2)", backgroundSize: `${200 / COLS}% ${200 / (ROWS * 0.85)}%` }} />
+
+          {/* Floor grid overlay */}
+          <div style={{ position: "absolute", top: "15%", left: 0, right: 0, bottom: 0 }}>
+            {[...Array(COLS + 1)].map((_, i) => <div key={`v${i}`} style={{ position: "absolute", left: `${(i / COLS) * 100}%`, top: 0, bottom: 0, width: 1, background: "rgba(244,244,240,0.03)" }} />)}
+            {[...Array(ROWS)].map((_, i) => <div key={`h${i}`} style={{ position: "absolute", top: `${(i / (ROWS * 0.85)) * 100}%`, left: 0, right: 0, height: 1, background: "rgba(244,244,240,0.03)" }} />)}
+          </div>
+
+          {/* Furniture */}
+          {[[0, 1, "🛋️", 2, 1], [10, 1, "🪴", 1, 1], [5, 3, "☕", 1, 1], [11, 6, "💡", 1, 1], [0, 6, "🎵", 1, 1], [3, 6, "📚", 1, 1], [8, 1, "🖥️", 1, 1]].map(([fx, fy, emoji, fw, fh], i) => (
+            <div key={`f${i}`} style={{ position: "absolute", left: `${(fx / COLS) * 100}%`, top: `${(15 + (fy / ROWS) * 85)}%`, width: `${(fw / COLS) * 100}%`, height: `${(fh / ROWS) * 85}%`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(16px, 3vw, 28px)", pointerEvents: "none", opacity: 0.7, zIndex: 5 + fy }}>{emoji}</div>
           ))}
 
           {/* Players */}
           {allPlayers.map(p => {
             const bubble = chatBubbles[p.uid];
+            const pxLeft = `${(p.x / COLS) * 100}%`;
+            const pxTop = `${(15 + (p.y / ROWS) * 85)}%`;
+            const tileW = `${100 / COLS}%`;
+            const tileH = `${85 / ROWS}%`;
             return (
-              <div key={p.uid} style={{ position: "absolute", left: `${(p.x / COLS) * 100}%`, top: `${(p.y / ROWS) * 100}%`, width: `${100 / COLS}%`, height: `${100 / ROWS}%`, transition: "left 0.15s ease, top 0.15s ease", zIndex: 10 + p.y, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end" }}>
+              <div key={p.uid} style={{ position: "absolute", left: pxLeft, top: pxTop, width: tileW, height: tileH, transition: "left 0.18s ease, top 0.18s ease", zIndex: 10 + p.y }}>
                 {/* Chat bubble */}
                 {bubble && (
-                  <div style={{ position: "absolute", bottom: "100%", background: WHITE, color: BLACK, padding: "3px 7px", fontSize: "clamp(7px, 1.2vw, 10px)", borderRadius: 6, maxWidth: 120, textAlign: "center", lineHeight: 1.3, whiteSpace: "pre-wrap", wordBreak: "break-word", marginBottom: 2, fontFamily: fontStack, pointerEvents: "none", zIndex: 100 }}>
+                  <div style={{ position: "absolute", bottom: "105%", left: "50%", transform: "translateX(-50%)", background: WHITE, color: BLACK, padding: "4px 8px", fontSize: "clamp(8px, 1.3vw, 11px)", borderRadius: 8, maxWidth: 140, textAlign: "center", lineHeight: 1.4, whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: fontStack, pointerEvents: "none", zIndex: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>
                     {bubble.text}
-                    <div style={{ position: "absolute", bottom: -4, left: "50%", transform: "translateX(-50%)", width: 0, height: 0, borderLeft: "4px solid transparent", borderRight: "4px solid transparent", borderTop: `4px solid ${WHITE}` }} />
+                    <div style={{ position: "absolute", bottom: -5, left: "50%", transform: "translateX(-50%)", width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: `5px solid ${WHITE}` }} />
                   </div>
                 )}
-                {/* Name */}
-                <div style={{ position: "absolute", top: -14, fontSize: "clamp(6px, 1vw, 8px)", color: p.isMe ? ACCENT : GREY, textTransform: "uppercase", letterSpacing: "0.12em", whiteSpace: "nowrap", pointerEvents: "none", fontFamily: fontStack }}>{p.name}</div>
-                {/* Character — simple pixel block */}
-                <div style={{ width: "70%", aspectRatio: "1", position: "relative" }}>
-                  <PixelAvatar a={p.avatar || myAvatar} prefs={p.prefs || avatarPrefs} facing={p.facing || "front"} sex={p.sex || sex} age={parseInt(p.age || age, 10) || null} size={1} />
+                {/* Name tag */}
+                <div style={{ position: "absolute", top: -16, left: "50%", transform: "translateX(-50%)", fontSize: "clamp(7px, 1.1vw, 9px)", color: p.isMe ? ACCENT : "#AAA", textTransform: "uppercase", letterSpacing: "0.1em", whiteSpace: "nowrap", pointerEvents: "none", fontFamily: fontStack, fontWeight: p.isMe ? 600 : 400, textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>{p.name}</div>
+                {/* Shadow */}
+                <div style={{ position: "absolute", bottom: 0, left: "20%", width: "60%", height: "12%", background: "rgba(0,0,0,0.3)", borderRadius: "50%" }} />
+                {/* Character */}
+                <div style={{ position: "absolute", inset: "5% 10% 8%", overflow: "hidden" }}>
+                  <PixelAvatar a={p.avatar || myAvatar} prefs={p.prefs || avatarPrefs} facing={p.facing || "front"} sex={p.sex || sex} age={parseInt(p.age || age, 10) || null} />
                 </div>
               </div>
             );
