@@ -90,6 +90,40 @@ export async function upsertFitDay(userId, date, fields) {
   return data;
 }
 
+// ---- Shared feed ----
+export async function shareDay(userId, fields) {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("shared_days")
+    .upsert({ user_id: userId, ...fields }, { onConflict: "user_id,date" })
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+export async function getFeed(date) {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("shared_days")
+    .select("*")
+    .eq("date", date)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) throw error;
+  return data || [];
+}
+export async function getMyShare(userId, date) {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("shared_days")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("date", date)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 // Compute current streak (consecutive days up to today with wore=true).
 export function computeStreak(log) {
   const wore = new Set(log.filter((r) => r.wore).map((r) => r.date));

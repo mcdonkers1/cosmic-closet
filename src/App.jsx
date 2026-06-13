@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import Auth from "./Auth.jsx";
-import { supabaseReady, getSession, onAuthChange, getProfile, upsertProfile, getFitLog, upsertFitDay, computeStreak, signOut } from "./supabase.js";
+import { supabaseReady, getSession, onAuthChange, getProfile, upsertProfile, getFitLog, upsertFitDay, computeStreak, signOut, shareDay, getFeed, getMyShare } from "./supabase.js";
 
 const SIGNS = [
   { name: "Aries", symbol: "♈︎", dates: "Mar 21 – Apr 19", element: "Fire", vibe: "bold, structured, energetic" },
@@ -61,7 +61,7 @@ export default function CosmicCloset() {
   const [history, setHistory] = useState([]);   // [{date, sign, reading}]
   const [viewingDate, setViewingDate] = useState(todayKey());
   const [profileLoaded, setProfileLoaded] = useState(false);
-  const [view, setView] = useState("today");        // "today" | "home" | "profile"
+  const [view, setView] = useState("today");        // "today" | "friends" | "profile"
   const [showCard, setShowCard] = useState(false);
   const [avatarPrefs, setAvatarPrefs] = useState({ skin: "#E6C39A", hair: "", hairColor: "", glasses: "none", scene: "void", accessory: "none", budget: "$$" });
   const [facing, setFacing] = useState("front");
@@ -1273,7 +1273,7 @@ export default function CosmicCloset() {
             {view !== "today" && (
               <button className="chip up" onClick={() => setView("today")} style={{ background: "transparent", color: GREY, border: `1px solid ${LINE}`, padding: "6px 11px", fontSize: 9, fontFamily: fontStack, cursor: "pointer" }}>← Today</button>
             )}
-            <button className="chip up" onClick={() => setView(view === "home" ? "today" : "home")} style={{ background: view === "home" ? WHITE : "transparent", color: view === "home" ? BLACK : WHITE, border: `1px solid ${LINE}`, padding: "6px 11px", fontSize: 9, fontFamily: fontStack, cursor: "pointer" }}>Home</button>
+            <button className="chip up" onClick={() => setView(view === "friends" ? "today" : "friends")} style={{ background: view === "friends" ? WHITE : "transparent", color: view === "friends" ? BLACK : WHITE, border: `1px solid ${LINE}`, padding: "6px 11px", fontSize: 9, fontFamily: fontStack, cursor: "pointer" }}>Friends</button>
             <button className="chip up" onClick={() => {
               if (view === "profile") { setView("today"); return; }
               if (!user && supabaseReady) { setAuthPrompt(true); return; }
@@ -1287,8 +1287,8 @@ export default function CosmicCloset() {
 
       {view === "profile" ? (
         <ProfileView />
-      ) : view === "home" ? (
-        <HomeView />
+      ) : view === "friends" ? (
+        <FriendsView />
       ) : (
       <React.Fragment>
 
@@ -1686,81 +1686,131 @@ export default function CosmicCloset() {
     </div>
   );
 
-  // ---------- Home — today's card to share ----------
-  function HomeView() {
+  // ---------- Friends feed ----------
+  function FriendsView() {
+    const [feed, setFeed] = useState([]);
+    const [feedLoading, setFeedLoading] = useState(true);
+    const [shared, setShared] = useState(false);
+    const [sharing, setSharing] = useState(false);
     const up = { textTransform: "uppercase", letterSpacing: "0.18em" };
     const btn = { border: `1px solid ${LINE}`, background: "transparent", color: WHITE, fontFamily: fontStack, cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.12em" };
-    const todayReading = reading;
-    const todaySign = sign;
-    const eff = getEffectiveFitLog();
-    const wore = eff[todayKey()]?.wore;
 
-    if (!todaySign || !todayReading) {
-      return (
-        <main style={{ maxWidth: 760, margin: "0 auto", position: "relative", zIndex: 1, padding: "80px 24px", textAlign: "center" }}>
-          <div style={{ fontSize: 40, marginBottom: 16 }}>✦</div>
-          <h2 className="up" style={{ fontSize: 14, fontWeight: 400, marginBottom: 12 }}>No reading yet</h2>
-          <p style={{ color: GREY, fontSize: 12, lineHeight: 1.8, marginBottom: 24 }}>Pick your sign and generate today's reading first.</p>
-          <button className="up" onClick={() => setView("today")} style={{ ...btn, padding: "12px 20px", fontSize: 10, background: WHITE, color: BLACK }}>Go to today →</button>
-        </main>
-      );
+    useEffect(() => {
+      (async () => {
+        setFeedLoading(true);
+        const items = await getFeed(todayKey());
+        setFeed(items);
+        if (user) {
+          const mine = items.find(i => i.user_id === user.id);
+          if (mine) setShared(true);
+        }
+        setFeedLoading(false);
+      })();
+    }, [user]);
+
+    async function handleShare() {
+      if (!user) { setAuthPrompt(true); return; }
+      if (!sign || !reading) return;
+      setSharing(true);
+      try {
+        const s = SIGNS.find(x => x.name === sign.name);
+        await shareDay(user.id, {
+          date: todayKey(),
+          display_name: displayName || user.email?.split("@")[0] || "Anonymous",
+          sign_name: sign.name,
+          sign_symbol: sign.symbol,
+          fit_name: reading.fitName || "",
+          fit: reading.fit || "",
+          mood: reading.mood || "",
+          activity: reading.activity || "",
+          playlist: reading.playlist || [],
+          avatar: deriveAvatar(reading, sign),
+          prefs: { ...avatarPrefs },
+        });
+        setShared(true);
+        const items = await getFeed(todayKey());
+        setFeed(items);
+      } catch (e) { console.error(e); }
+      setSharing(false);
     }
-
-    const av = deriveAvatar(todayReading, todaySign);
-    const dateStr = new Date(viewingDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }).toUpperCase();
 
     return (
       <main style={{ maxWidth: 760, margin: "0 auto", position: "relative", zIndex: 1, padding: "0 24px 80px" }}>
-        {/* Today's card */}
-        <section style={{ padding: "36px 0", borderBottom: `1px solid ${LINE}`, textAlign: "center" }}>
-          <div className="up" style={{ fontSize: 9, color: GREY, marginBottom: 6 }}>{dateStr}</div>
-          <div style={{ fontSize: 44, marginBottom: 4 }}>{todaySign.symbol}</div>
-          <div className="up" style={{ fontSize: 16, letterSpacing: "0.22em", marginBottom: 4 }}>{todaySign.name}</div>
-          <div className="up" style={{ fontSize: 9, color: GREY }}>{todaySign.element} · {todaySign.vibe}</div>
+        {/* Share your day */}
+        <section style={{ padding: "28px 0", borderBottom: `1px solid ${LINE}`, textAlign: "center" }}>
+          <div className="up" style={{ fontSize: 10, color: GREY, marginBottom: 16 }}>Today's feed</div>
+          {sign && reading ? (
+            <button className="up" onClick={handleShare} disabled={shared || sharing}
+              style={{ background: shared ? "transparent" : ACCENT, color: shared ? ACCENT : BLACK, border: `1px solid ${shared ? ACCENT : "transparent"}`, padding: "13px 24px", fontSize: 10, letterSpacing: "0.14em", fontFamily: fontStack, cursor: shared ? "default" : "pointer", fontWeight: 600 }}>
+              {shared ? "✓ Shared today" : sharing ? "Sharing…" : "✦ Share your fit to friends"}
+            </button>
+          ) : (
+            <p style={{ color: GREY, fontSize: 11, lineHeight: 1.8 }}>Pick a sign and generate your reading to share it here.</p>
+          )}
         </section>
 
-        {/* Fit card */}
-        <section style={{ padding: "28px 0", borderBottom: `1px solid ${LINE}` }}>
-          <div style={{ display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
-            <div style={{ width: "min(160px, 40vw)", flexShrink: 0, background: "#0D0D10", border: `1px solid ${LINE}`, overflow: "hidden", position: "relative" }}>
-              <PixelAvatar a={av} prefs={avatarPrefs} facing="front" sex={sex} age={parseInt(age, 10) || null} />
-              <div aria-hidden style={{ position: "absolute", inset: 0, pointerEvents: "none", backgroundImage: "repeating-linear-gradient(transparent 0 2px, rgba(0,0,0,0.18) 2px 3px)" }} />
-            </div>
-            <div style={{ flex: 1, minWidth: 200 }}>
-              <div className="up" style={{ fontSize: 9, color: ACCENT, letterSpacing: "0.16em", marginBottom: 8 }}>Today's fit</div>
-              {todayReading.fitName && <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 6 }}>{todayReading.fitName}</div>}
-              <div style={{ fontSize: 13, color: GREY, lineHeight: 1.7, marginBottom: 16 }}>{todayReading.fit}</div>
-              <div className="up" style={{ fontSize: 9, color: GREY, marginBottom: 4 }}>Mood</div>
-              <div style={{ fontSize: 14, fontStyle: "italic", marginBottom: 16 }}>{todayReading.mood || todayReading.power?.split(".")[0]}</div>
-              <div className="up" style={{ fontSize: 9, color: ACCENT, marginBottom: 4 }}>Do this</div>
-              <div style={{ fontSize: 13, lineHeight: 1.6 }}>{todayReading.activity}</div>
-            </div>
+        {/* Feed */}
+        {feedLoading ? (
+          <div style={{ padding: "40px 0", textAlign: "center" }}>
+            <div className="skel" style={{ width: 200, height: 12, margin: "0 auto 16px" }} />
+            <div className="skel" style={{ width: 160, height: 12, margin: "0 auto" }} />
           </div>
-        </section>
-
-        {/* Soundtrack */}
-        {todayReading.playlist?.length > 0 && (
-          <section style={{ padding: "28px 0", borderBottom: `1px solid ${LINE}` }}>
-            <div className="up" style={{ fontSize: 10, marginBottom: 14 }}>The soundtrack</div>
-            {todayReading.playlist.slice(0, 5).map((song, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderTop: i > 0 ? `1px solid ${LINE}` : "none" }}>
-                <span style={{ fontSize: 12, color: DIM, width: 20, fontFamily: fontStack }}>{String(i + 1).padStart(2, "0")}</span>
-                <span style={{ flex: 1, fontSize: 13 }}>{song}</span>
-              </div>
-            ))}
-          </section>
+        ) : feed.length === 0 ? (
+          <div style={{ padding: "60px 0", textAlign: "center" }}>
+            <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.4 }}>✦</div>
+            <p className="up" style={{ color: DIM, fontSize: 10, lineHeight: 2 }}>No one has shared yet today.<br />Be the first.</p>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 0 }}>
+            {feed.map((item, idx) => {
+              const isMe = user && item.user_id === user.id;
+              return (
+                <div key={item.id || idx} style={{ padding: "24px 0", borderBottom: `1px solid ${LINE}` }}>
+                  {/* User header */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: LINE, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>{item.sign_symbol}</div>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 500 }}>{item.display_name}{isMe && <span style={{ color: ACCENT, fontSize: 9, marginLeft: 6 }}>YOU</span>}</div>
+                      <div className="up" style={{ fontSize: 8, color: GREY }}>{item.sign_name}</div>
+                    </div>
+                  </div>
+                  {/* Fit */}
+                  <div style={{ marginBottom: 12 }}>
+                    {item.fit_name && <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{item.fit_name}</div>}
+                    <div style={{ fontSize: 12, color: GREY, lineHeight: 1.7 }}>{item.fit}</div>
+                  </div>
+                  {/* Mood + activity */}
+                  <div style={{ display: "flex", gap: 20, marginBottom: 14, flexWrap: "wrap" }}>
+                    {item.mood && (
+                      <div>
+                        <div className="up" style={{ fontSize: 8, color: GREY, marginBottom: 2 }}>Mood</div>
+                        <div style={{ fontSize: 12, fontStyle: "italic" }}>{item.mood}</div>
+                      </div>
+                    )}
+                    {item.activity && (
+                      <div style={{ flex: 1, minWidth: 140 }}>
+                        <div className="up" style={{ fontSize: 8, color: ACCENT, marginBottom: 2 }}>Do this</div>
+                        <div style={{ fontSize: 12, lineHeight: 1.5 }}>{item.activity}</div>
+                      </div>
+                    )}
+                  </div>
+                  {/* Playlist */}
+                  {item.playlist?.length > 0 && (
+                    <div>
+                      <div className="up" style={{ fontSize: 8, color: GREY, marginBottom: 6 }}>Soundtrack</div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {item.playlist.slice(0, 5).map((song, i) => (
+                          <a key={i} href={`https://open.spotify.com/search/${encodeURIComponent(song.replace(/—/g, ""))}`} target="_blank" rel="noopener noreferrer"
+                            style={{ fontSize: 10, color: WHITE, background: "rgba(244,244,240,0.04)", border: `1px solid ${LINE}`, padding: "5px 9px", textDecoration: "none", fontFamily: fontStack, letterSpacing: "0.02em" }}>{song}</a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
-
-        {/* Share actions */}
-        <section style={{ padding: "28px 0" }}>
-          <div className="up" style={{ fontSize: 10, color: GREY, marginBottom: 16 }}>Share your day</div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button className="up popbtn" onClick={() => setShowCard(true)} style={{ background: ACCENT, color: BLACK, border: "none", padding: "13px 20px", fontSize: 10, letterSpacing: "0.14em", fontFamily: fontStack, cursor: "pointer", fontWeight: 600 }}>✦ Share card</button>
-            <a className="up popbtn" href={`https://www.instagram.com/`} target="_blank" rel="noopener noreferrer" style={{ ...btn, padding: "13px 16px", fontSize: 10, textDecoration: "none" }}>Instagram</a>
-            <a className="up popbtn" href={`https://www.tiktok.com/`} target="_blank" rel="noopener noreferrer" style={{ ...btn, padding: "13px 16px", fontSize: 10, textDecoration: "none" }}>TikTok</a>
-          </div>
-          <p className="up" style={{ color: DIM, fontSize: 8, marginTop: 14, letterSpacing: "0.1em", lineHeight: 2 }}>Save the card image, then post it to your story</p>
-        </section>
       </main>
     );
   }
