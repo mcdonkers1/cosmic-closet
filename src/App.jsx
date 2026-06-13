@@ -1699,6 +1699,7 @@ export default function CosmicCloset() {
       studio: { name: "Streetwear Studio", wall: "linear-gradient(180deg, #3D3B6D 0%, #2E2B55 100%)", floor1: "#4A4670", floor2: "#3E3A62", accent: "#C9F24D", wallBase: "#5A5690" },
       bedroom: { name: "The Bedroom", wall: "linear-gradient(180deg, #5A3A5E 0%, #3E2844 100%)", floor1: "#584068", floor2: "#4A3458", accent: "#E8A0E8", wallBase: "#6A4A70" },
       rooftop: { name: "Rooftop Lounge", wall: "linear-gradient(180deg, #1A2848 0%, #0E1A30 100%)", floor1: "#3A4A5A", floor2: "#2E3E4E", accent: "#6AE4FF", wallBase: "#4A5A6A" },
+      gameroom: { name: "Game Room", wall: "linear-gradient(180deg, #2A1A1A 0%, #1A1218 100%)", floor1: "#2A3828", floor2: "#223020", accent: "#FFD700", wallBase: "#4A3A2A" },
     };
     const [room, setRoom] = useState("studio");
     const [myPos, setMyPos] = useState({ x: 4, y: 3 });
@@ -1733,6 +1734,17 @@ export default function CosmicCloset() {
     function FStool() { return <PxF vw={12} vh={16}>{P(2,0,8,4,"#5A4A3A")}{P(2,0,8,1,"#7A6A5A")}{P(3,4,2,12,"#4A3A2A")}{P(7,4,2,12,"#4A3A2A")}</PxF>; }
     function FChair() { return <PxF vw={16} vh={24}>{P(2,6,12,4,"#5A5ACD")}{P(2,6,12,1,"#7A7AED")}{P(2,0,12,8,"#6A6ADA")}{P(3,10,2,14,"#3A3A3A")}{P(11,10,2,14,"#3A3A3A")}</PxF>; }
     function FStars() { return <PxF vw={100} vh={40}>{[...Array(30)].map((_,i)=><circle key={i} cx={(i*37+5)%100} cy={(i*23+3)%40} r={i%5===0?1.5:0.7} fill={i%4===0?"#C9F24D":"#FFF"} opacity={i%3===0?0.8:0.25}/>)}<circle cx="85" cy="8" r="5" fill="#FFF" opacity="0.12"/><circle cx="82" cy="6" r="1.5" fill="#FFF" opacity="0.3"/></PxF>; }
+    function FGameTable({ game }) {
+      const colors = { tictactoe: "#E06", connect4: "#4AF", chess: "#FFD700", poker: "#1DB954" };
+      const c = colors[game] || "#FFD700";
+      return <PxF vw={32} vh={24}>
+        {P(4,0,24,4,c)}{P(4,0,24,1,"#FFF")}{P(5,1,22,2,c)}
+        {P(6,4,20,14,"#2A1A0A")}{P(7,5,18,12,"#1A1208")}
+        {game === "tictactoe" && <>{P(12,7,1,8,"#555")}{P(18,7,1,8,"#555")}{P(9,10,12,1,"#555")}{P(9,13,12,1,"#555")}</>}
+        {game === "connect4" && <>{[0,1,2,3,4,5].map(i=><>{P(9+i*3,7,2,2,"#224")}{P(9+i*3,11,2,2,"#224")}{P(9+i*3,15,2,2,"#224")}</>)}</>}
+        {P(6,18,4,6,"#3A2A1A")}{P(22,18,4,6,"#3A2A1A")}
+      </PxF>;
+    }
 
     // Room furniture layouts — packed with items
     const [interacting, setInteracting] = useState(null); // { type, data }
@@ -1786,17 +1798,32 @@ export default function CosmicCloset() {
         { x: 0, y: 6, w: 1, h: 1, comp: <FLamp /> },
         { x: 9, y: 6, w: 1, h: 1, comp: <FLamp /> },
       ],
+      gameroom: [
+        { x: 1, y: 1, w: 2, h: 1, comp: <FGameTable game="tictactoe" />, action: "game", game: "tictactoe" },
+        { x: 0, y: 2, w: 1, h: 1, comp: <FStool /> },
+        { x: 3, y: 2, w: 1, h: 1, comp: <FStool /> },
+        { x: 6, y: 1, w: 2, h: 1, comp: <FGameTable game="connect4" />, action: "game", game: "connect4" },
+        { x: 5, y: 2, w: 1, h: 1, comp: <FStool /> },
+        { x: 8, y: 2, w: 1, h: 1, comp: <FStool /> },
+        { x: 0, y: 0, w: 1, h: 1, comp: <FLamp /> },
+        { x: 9, y: 0, w: 1, h: 1, comp: <FLamp /> },
+        { x: 3, y: 5, w: 4, h: 2, comp: <FRug /> },
+        { x: 4, y: 5, w: 2, h: 1, comp: <FCouch c="#5A3A2A" /> },
+        { x: 0, y: 6, w: 1, h: 1, comp: <FPlant /> },
+        { x: 9, y: 6, w: 1, h: 1, comp: <FPlant /> },
+      ],
     };
 
     // Check for interactions when player moves onto furniture
     useEffect(() => {
       const furn = (FURNITURE[room] || []);
-      const onDJ = furn.some(f => f.action === "dj" && myPos.x >= f.x && myPos.x < f.x + f.w && myPos.y >= f.y && myPos.y < f.y + f.h);
-      if (onDJ && reading?.playlist) {
-        if (!interacting || interacting.type !== "dj") {
-          setInteracting({ type: "dj", playlist: reading.playlist });
-        }
-        // Stop idle wandering while at DJ booth
+      const hit = furn.find(f => f.action && myPos.x >= f.x && myPos.x < f.x + f.w && myPos.y >= f.y && myPos.y < f.y + f.h);
+      if (hit?.action === "dj" && reading?.playlist) {
+        if (!interacting || interacting.type !== "dj") setInteracting({ type: "dj", playlist: reading.playlist });
+        if (wanderInterval.current) { clearInterval(wanderInterval.current); wanderInterval.current = null; }
+        if (idleTimer.current) { clearTimeout(idleTimer.current); idleTimer.current = null; }
+      } else if (hit?.action === "game") {
+        if (!interacting || interacting.game !== hit.game) setInteracting({ type: "game", game: hit.game });
         if (wanderInterval.current) { clearInterval(wanderInterval.current); wanderInterval.current = null; }
         if (idleTimer.current) { clearTimeout(idleTimer.current); idleTimer.current = null; }
       } else if (interacting) {
@@ -1981,6 +2008,142 @@ export default function CosmicCloset() {
       );
     }
 
+    // Game Panel — Tic Tac Toe & Connect 4
+    function GamePanel({ game, accent }) {
+      const [board, setBoard] = useState(game === "connect4" ? Array(42).fill(null) : Array(9).fill(null));
+      const [isX, setIsX] = useState(true);
+      const [winner, setWinner] = useState(null);
+      const [credits, setCredits] = useState(100);
+      const [bet, setBet] = useState(10);
+      const [betPlaced, setBetPlaced] = useState(false);
+
+      // Load credits from profile
+      useEffect(() => {
+        if (user && cloudProfile?.credits != null) setCredits(cloudProfile.credits);
+      }, [cloudProfile]);
+
+      async function saveCredits(newCredits) {
+        setCredits(newCredits);
+        if (user) {
+          try { await upsertProfile(user.id, { credits: newCredits }); } catch {}
+        }
+      }
+
+      function checkWinTTT(b) {
+        const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+        for (const [a,c,d] of lines) { if (b[a] && b[a] === b[c] && b[a] === b[d]) return b[a]; }
+        return b.every(Boolean) ? "draw" : null;
+      }
+
+      function checkWinC4(b) {
+        const COLS = 7, ROWS = 6;
+        const at = (r, c) => (r >= 0 && r < ROWS && c >= 0 && c < COLS) ? b[r * COLS + c] : null;
+        for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+          const v = at(r, c); if (!v) continue;
+          if (c + 3 < COLS && v === at(r,c+1) && v === at(r,c+2) && v === at(r,c+3)) return v;
+          if (r + 3 < ROWS && v === at(r+1,c) && v === at(r+2,c) && v === at(r+3,c)) return v;
+          if (r + 3 < ROWS && c + 3 < COLS && v === at(r+1,c+1) && v === at(r+2,c+2) && v === at(r+3,c+3)) return v;
+          if (r + 3 < ROWS && c - 3 >= 0 && v === at(r+1,c-1) && v === at(r+2,c-2) && v === at(r+3,c-3)) return v;
+        }
+        return b.every(Boolean) ? "draw" : null;
+      }
+
+      function playTTT(i) {
+        if (board[i] || winner) return;
+        const next = [...board]; next[i] = isX ? "X" : "O";
+        setBoard(next); setIsX(!isX);
+        const w = checkWinTTT(next);
+        if (w) { setWinner(w); if (betPlaced) { if (w === "X") saveCredits(credits + bet * 2); else if (w === "draw") saveCredits(credits + bet); } }
+      }
+
+      function playC4(col) {
+        if (winner) return;
+        const COLS = 7;
+        // Find lowest empty row in this column
+        let row = -1;
+        for (let r = 5; r >= 0; r--) { if (!board[r * COLS + col]) { row = r; break; } }
+        if (row === -1) return;
+        const next = [...board]; next[row * COLS + col] = isX ? "R" : "Y";
+        setBoard(next); setIsX(!isX);
+        const w = checkWinC4(next);
+        if (w) { setWinner(w); if (betPlaced) { if (w === "R") saveCredits(credits + bet * 2); else if (w === "draw") saveCredits(credits + bet); } }
+      }
+
+      function reset() { setBoard(game === "connect4" ? Array(42).fill(null) : Array(9).fill(null)); setIsX(true); setWinner(null); setBetPlaced(false); }
+
+      function placeBet() {
+        if (bet > credits || bet < 1) return;
+        saveCredits(credits - bet);
+        setBetPlaced(true);
+      }
+
+      const cellBtn = { border: `1px solid rgba(255,255,255,0.15)`, background: "rgba(0,0,0,0.3)", cursor: "pointer", fontFamily: fontStack, display: "flex", alignItems: "center", justifyContent: "center" };
+
+      return (
+        <div style={{ padding: "16px 24px", borderTop: `2px solid ${accent}`, background: "rgba(0,0,0,0.4)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <span className="up" style={{ fontSize: 11, color: accent, letterSpacing: "0.16em" }}>🎮 {game === "tictactoe" ? "Tic Tac Toe" : "Connect 4"}</span>
+            <span className="up" style={{ fontSize: 10, color: "#FFD700" }}>💰 {credits} credits</span>
+          </div>
+
+          {/* Betting */}
+          {!betPlaced && !winner && (
+            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14, flexWrap: "wrap" }}>
+              <span className="up" style={{ fontSize: 9, color: GREY }}>Bet:</span>
+              {[5, 10, 25, 50].map(b => (
+                <button key={b} className="up" onClick={() => setBet(b)} style={{ background: bet === b ? accent : "transparent", color: bet === b ? BLACK : WHITE, border: `1px solid ${bet === b ? accent : LINE}`, padding: "5px 10px", fontSize: 9, fontFamily: fontStack, cursor: "pointer", fontWeight: 600 }}>{b}</button>
+              ))}
+              <button className="up" onClick={placeBet} disabled={bet > credits} style={{ background: "#1DB954", color: WHITE, border: "none", padding: "6px 14px", fontSize: 9, fontFamily: fontStack, cursor: "pointer", fontWeight: 600, marginLeft: "auto" }}>Play for {bet} 💰</button>
+            </div>
+          )}
+
+          {/* Game board */}
+          <div style={{ maxWidth: 360, margin: "0 auto" }}>
+            {game === "tictactoe" ? (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4 }}>
+                {board.map((cell, i) => (
+                  <button key={i} onClick={() => playTTT(i)} style={{ ...cellBtn, aspectRatio: "1", fontSize: 28, color: cell === "X" ? "#E06" : "#4AF", fontWeight: 700 }}>{cell || ""}</button>
+                ))}
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
+                {/* Column buttons */}
+                {[...Array(7)].map((_, c) => (
+                  <button key={`drop${c}`} onClick={() => playC4(c)} className="up" style={{ background: "transparent", color: isX ? "#E06" : "#FFD700", border: `1px solid ${LINE}`, padding: "4px", fontSize: 8, fontFamily: fontStack, cursor: "pointer" }}>▼</button>
+                ))}
+                {board.map((cell, i) => (
+                  <div key={i} style={{ aspectRatio: "1", background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {cell && <div style={{ width: "75%", height: "75%", borderRadius: "50%", background: cell === "R" ? "#E06" : "#FFD700" }} />}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Status */}
+          <div style={{ textAlign: "center", marginTop: 14 }}>
+            {winner ? (
+              <div>
+                <div className="up" style={{ fontSize: 12, color: accent, marginBottom: 8 }}>
+                  {winner === "draw" ? "It's a draw!" : `${winner} wins!`}
+                  {betPlaced && winner !== "draw" && winner === (game === "tictactoe" ? "X" : "R") && <span style={{ color: "#FFD700" }}> +{bet * 2} 💰</span>}
+                  {betPlaced && winner === "draw" && <span style={{ color: GREY }}> Bet returned</span>}
+                  {betPlaced && winner !== "draw" && winner !== (game === "tictactoe" ? "X" : "R") && <span style={{ color: "#E06" }}> Lost {bet} 💰</span>}
+                </div>
+                <button className="up" onClick={reset} style={{ background: accent, color: BLACK, border: "none", padding: "8px 20px", fontSize: 10, fontFamily: fontStack, cursor: "pointer", fontWeight: 600 }}>Play again</button>
+              </div>
+            ) : (
+              <div className="up" style={{ fontSize: 9, color: GREY }}>
+                {game === "tictactoe" ? `${isX ? "X" : "O"}'s turn` : `${isX ? "Red" : "Yellow"}'s turn`}
+                {betPlaced && <span style={{ color: "#FFD700", marginLeft: 10 }}>Bet: {bet} 💰</span>}
+              </div>
+            )}
+          </div>
+          <div className="up" style={{ fontSize: 8, color: DIM, marginTop: 10, letterSpacing: "0.1em", textAlign: "center" }}>Walk onto a game table to play · Walk away to leave</div>
+        </div>
+      );
+    }
+
     return (
       <div style={{ position: "relative", zIndex: 1 }}>
         {/* Room header + nav */}
@@ -2010,6 +2173,11 @@ export default function CosmicCloset() {
             {room === "bedroom" && <>
               <div style={{ position: "absolute", left: "10%", top: "8%", width: "20%", height: "80%", background: "#0D0D1A", border: "2px solid rgba(255,255,255,0.08)", borderRadius: 4, overflow: "hidden" }}><div style={{ position: "absolute", inset: 3, background: "linear-gradient(180deg, #0D0B2E, #2D2860)" }}><circle cx="50%" cy="30%" r="3" fill="#FFF" opacity="0.4" /><circle cx="30%" cy="50%" r="2" fill="#E8A0E8" opacity="0.3" /></div></div>
               <div style={{ position: "absolute", right: "10%", top: "15%", width: "10%", height: "60%", background: "#0D0D1A", border: "2px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: "60%", height: "60%", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.15)" }} /></div>
+            </>}
+            {room === "gameroom" && <>
+              <div style={{ position: "absolute", left: "5%", top: "8%", width: "22%", height: "78%", background: "#0D0D1A", border: "2px solid rgba(255,215,0,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: "clamp(16px, 3vw, 32px)", color: "#FFD700" }}>🎮</span></div>
+              <div style={{ position: "absolute", left: "35%", top: "12%", width: "30%", height: "70%", background: "#0D0D1A", border: "2px solid rgba(255,215,0,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}><span className="up" style={{ fontSize: "clamp(8px, 1.5vw, 14px)", color: "#FFD700", letterSpacing: "0.2em" }}>Game Room</span></div>
+              <div style={{ position: "absolute", right: "5%", top: "8%", width: "22%", height: "78%", background: "#0D0D1A", border: "2px solid rgba(255,215,0,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: "clamp(16px, 3vw, 32px)", color: "#FFD700" }}>🏆</span></div>
             </>}
           </div>
 
@@ -2050,6 +2218,9 @@ export default function CosmicCloset() {
 
         {/* DJ Interaction — Spotify previews */}
         {interacting?.type === "dj" && interacting.playlist?.length > 0 && <DJPanel playlist={interacting.playlist} accent={R.accent} />}
+
+        {/* Game Interaction */}
+        {interacting?.type === "game" && <GamePanel game={interacting.game} accent={R.accent} />}
 
         {/* Chat */}
         <div style={{ display: "flex", gap: 8, padding: "12px 24px", borderTop: `1px solid ${LINE}` }}>
