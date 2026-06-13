@@ -1789,11 +1789,21 @@ export default function CosmicCloset() {
     };
 
     // Check for interactions when player moves onto furniture
+    const prevPos = useRef(myPos);
     useEffect(() => {
       const furn = (FURNITURE[room] || []);
       const hit = furn.find(f => f.action && myPos.x >= f.x && myPos.x < f.x + f.w && myPos.y >= f.y && myPos.y < f.y + f.h);
-      if (hit?.action === "dj" && reading?.playlist) setInteracting({ type: "dj", playlist: reading.playlist });
-      else setInteracting(null);
+      if (hit?.action === "dj" && reading?.playlist) {
+        setInteracting({ type: "dj", playlist: reading.playlist });
+        // Stop idle wandering while at DJ booth
+        if (wanderInterval.current) { clearInterval(wanderInterval.current); wanderInterval.current = null; }
+        if (idleTimer.current) { clearTimeout(idleTimer.current); idleTimer.current = null; }
+      } else if (interacting && (prevPos.current.x !== myPos.x || prevPos.current.y !== myPos.y)) {
+        // Only clear interaction when user actively moves away
+        setInteracting(null);
+        resetIdle();
+      }
+      prevPos.current = myPos;
     }, [myPos, room]);
 
     // Realtime presence per room
@@ -1952,7 +1962,7 @@ export default function CosmicCloset() {
                   {t.found && t.preview_url ? (
                     <button onClick={() => togglePlay(i)} style={{ background: playing === i ? accent : "transparent", color: playing === i ? BLACK : WHITE, border: `1px solid ${playing === i ? accent : LINE}`, width: 32, height: 32, fontSize: 14, cursor: "pointer", fontFamily: fontStack, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{playing === i ? "■" : "▶"}</button>
                   ) : t.found ? (
-                    <a href={t.spotify_url} target="_blank" rel="noopener noreferrer" style={{ color: GREY, fontSize: 9, textDecoration: "none", border: `1px solid ${LINE}`, padding: "4px 8px", fontFamily: fontStack, letterSpacing: "0.1em", textTransform: "uppercase", flexShrink: 0 }}>Open</a>
+                    <a href={t.spotify_url || `https://open.spotify.com/track/${t.id}`} target="_blank" rel="noopener noreferrer" style={{ color: WHITE, fontSize: 9, textDecoration: "none", background: "#1DB954", padding: "6px 10px", fontFamily: fontStack, letterSpacing: "0.1em", textTransform: "uppercase", flexShrink: 0, fontWeight: 600 }}>Play</a>
                   ) : null}
                 </div>
               ))}
