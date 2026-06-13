@@ -1953,20 +1953,27 @@ export default function CosmicCloset() {
             <div style={{ display: "flex", gap: 8 }}>{[1,2,3].map(i => <div key={i} className="skel" style={{ height: 48, flex: 1 }} />)}</div>
           ) : (
             <div style={{ display: "grid", gap: 6 }}>
-              {tracks.map((t, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, background: playing === i ? `${accent}15` : "rgba(255,255,255,0.04)", border: `1px solid ${playing === i ? accent : LINE}`, padding: "8px 12px", transition: "all .15s" }}>
-                  {t.found && t.image && <img src={t.image} alt="" style={{ width: 36, height: 36, objectFit: "cover" }} />}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, color: WHITE, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.found ? t.name : t.query}</div>
-                    {t.found && <div style={{ fontSize: 10, color: GREY, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.artist}</div>}
+              {tracks.map((t, i) => {
+                const searchUrl = `https://open.spotify.com/search/${encodeURIComponent((t.query || "").replace(/—/g, ""))}`;
+                return (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, background: playing === i ? `${accent}15` : "rgba(255,255,255,0.04)", border: `1px solid ${playing === i ? accent : LINE}`, padding: "8px 12px", transition: "all .15s" }}>
+                    {t.found && t.image ? (
+                      <img src={t.image} alt="" style={{ width: 40, height: 40, objectFit: "cover", flexShrink: 0 }} />
+                    ) : (
+                      <div style={{ width: 40, height: 40, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>♪</div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, color: WHITE, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.found ? t.name : t.query}</div>
+                      <div style={{ fontSize: 10, color: GREY, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.found ? t.artist : "Tap to search on Spotify"}</div>
+                    </div>
+                    {t.found && t.preview_url ? (
+                      <button onClick={() => togglePlay(i)} style={{ background: playing === i ? accent : "#1DB954", color: playing === i ? BLACK : WHITE, border: "none", width: 36, height: 36, fontSize: 16, cursor: "pointer", fontFamily: fontStack, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{playing === i ? "■" : "▶"}</button>
+                    ) : (
+                      <a href={t.found ? (t.spotify_url || searchUrl) : searchUrl} target="_blank" rel="noopener noreferrer" style={{ color: WHITE, fontSize: 9, textDecoration: "none", background: "#1DB954", padding: "8px 12px", fontFamily: fontStack, letterSpacing: "0.1em", textTransform: "uppercase", flexShrink: 0, fontWeight: 600 }}>Play</a>
+                    )}
                   </div>
-                  {t.found && t.preview_url ? (
-                    <button onClick={() => togglePlay(i)} style={{ background: playing === i ? accent : "transparent", color: playing === i ? BLACK : WHITE, border: `1px solid ${playing === i ? accent : LINE}`, width: 32, height: 32, fontSize: 14, cursor: "pointer", fontFamily: fontStack, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{playing === i ? "■" : "▶"}</button>
-                  ) : t.found ? (
-                    <a href={t.spotify_url || `https://open.spotify.com/track/${t.id}`} target="_blank" rel="noopener noreferrer" style={{ color: WHITE, fontSize: 9, textDecoration: "none", background: "#1DB954", padding: "6px 10px", fontFamily: fontStack, letterSpacing: "0.1em", textTransform: "uppercase", flexShrink: 0, fontWeight: 600 }}>Play</a>
-                  ) : null}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
           <div className="up" style={{ fontSize: 8, color: DIM, marginTop: 10, letterSpacing: "0.1em" }}>Walk onto the DJ booth to play · Walk away to stop</div>

@@ -41,13 +41,22 @@ export default async function handler(req, res) {
     const token = await getToken(clientId, clientSecret);
     const results = [];
 
-    // Search sequentially with small delay to avoid rate limits
+    // Search with rate limit handling
     for (const q of tracks.slice(0, 5)) {
       try {
-        const searchRes = await fetch(
+        let searchRes = await fetch(
           `https://api.spotify.com/v1/search?q=${encodeURIComponent(q.replace(/—/g, "-").trim())}&type=track&limit=1`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
+        // Retry once after delay if rate limited
+        if (searchRes.status === 429) {
+          const wait = parseInt(searchRes.headers.get("Retry-After") || "2", 10);
+          await new Promise(r => setTimeout(r, (wait + 1) * 1000));
+          searchRes = await fetch(
+            `https://api.spotify.com/v1/search?q=${encodeURIComponent(q.replace(/—/g, "-").trim())}&type=track&limit=1`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        }
         if (!searchRes.ok) { results.push({ query: q, found: false }); continue; }
         const data = await searchRes.json();
         const t = data.tracks?.items?.[0];
