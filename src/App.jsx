@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import Auth from "./Auth.jsx";
-import { supabaseReady, getSession, onAuthChange, getProfile, upsertProfile, getFitLog, upsertFitDay, computeStreak, signOut, shareDay, getFeed, getMyShare, searchUsers, getUserFeed, toggleLike, getLikes, addComment, getComments } from "./supabase.js";
+import { supabase, supabaseReady, getSession, onAuthChange, getProfile, upsertProfile, getFitLog, upsertFitDay, computeStreak, signOut, shareDay, getFeed, getMyShare, searchUsers, getUserFeed, toggleLike, getLikes, addComment, getComments } from "./supabase.js";
 
 const SIGNS = [
   { name: "Aries", symbol: "♈︎", dates: "Mar 21 – Apr 19", element: "Fire", vibe: "bold, structured, energetic" },
@@ -1275,6 +1275,10 @@ export default function CosmicCloset() {
             )}
             <button className="chip up" onClick={() => setView(view === "friends" ? "today" : "friends")} style={{ background: view === "friends" ? WHITE : "transparent", color: view === "friends" ? BLACK : WHITE, border: `1px solid ${LINE}`, padding: "6px 11px", fontSize: 9, fontFamily: fontStack, cursor: "pointer" }}>Friends</button>
             <button className="chip up" onClick={() => {
+              if (!user && supabaseReady) { setAuthPrompt(true); return; }
+              setView(view === "world" ? "today" : "world");
+            }} style={{ background: view === "world" ? ACCENT : "transparent", color: view === "world" ? BLACK : WHITE, border: `1px solid ${view === "world" ? ACCENT : LINE}`, padding: "6px 11px", fontSize: 9, fontFamily: fontStack, cursor: "pointer" }}>World</button>
+            <button className="chip up" onClick={() => {
               if (view === "profile") { setView("today"); return; }
               if (!user && supabaseReady) { setAuthPrompt(true); return; }
               setView("profile");
@@ -1289,6 +1293,8 @@ export default function CosmicCloset() {
         <ProfileView />
       ) : view === "friends" ? (
         <FriendsView />
+      ) : view === "world" ? (
+        <CosmicWorld />
       ) : (
       <React.Fragment>
 
@@ -1685,6 +1691,189 @@ export default function CosmicCloset() {
       )}
     </div>
   );
+
+  // ---------- Cosmic World — multiplayer room ----------
+  function CosmicWorld() {
+    const TILE = 40;
+    const COLS = 16, ROWS = 10;
+    const W = COLS * TILE, H = ROWS * TILE;
+    const [myPos, setMyPos] = useState({ x: Math.floor(Math.random() * COLS), y: Math.floor(Math.random() * ROWS) });
+    const [others, setOthers] = useState({});
+    const [chatMsg, setChatMsg] = useState("");
+    const [chatBubbles, setChatBubbles] = useState({});
+    const [chatLog, setChatLog] = useState([]);
+    const [myFacing, setMyFacing] = useState("front");
+    const channelRef = useRef(null);
+    const worldRef = useRef(null);
+
+    const myName = displayName || user?.email?.split("@")[0] || "Anon";
+    const myAvatar = reading && sign ? deriveAvatar(reading, sign) : { top: "tee", topColor: "#333", bottom: "jeans", bottomColor: "#234", shoes: "sneakers", shoeColor: "#222" };
+
+    // Supabase Realtime presence
+    useEffect(() => {
+      if (!supabaseReady || !user || !supabase) return;
+      const ch = supabase.channel("cosmic-world", { config: { presence: { key: user.id } } });
+      channelRef.current = ch;
+
+      ch.on("presence", { event: "sync" }, () => {
+        const state = ch.presenceState();
+        const o = {};
+        for (const [uid, arr] of Object.entries(state)) {
+          if (uid === user.id) continue;
+          const p = arr[0];
+          if (p) o[uid] = p;
+        }
+        setOthers(o);
+      });
+
+      ch.on("broadcast", { event: "chat" }, ({ payload }) => {
+        setChatBubbles(prev => ({ ...prev, [payload.uid]: { text: payload.text, t: Date.now() } }));
+        setChatLog(prev => [...prev.slice(-50), { name: payload.name, text: payload.text, t: Date.now() }]);
+      });
+
+      ch.subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await ch.track({ x: myPos.x, y: myPos.y, name: myName, facing: "front", avatar: myAvatar, prefs: avatarPrefs, sex, age });
+        }
+      });
+
+      return () => { ch.unsubscribe(); };
+    }, [user]);
+
+    // Track position changes
+    useEffect(() => {
+      if (channelRef.current && user) {
+        channelRef.current.track({ x: myPos.x, y: myPos.y, name: myName, facing: myFacing, avatar: myAvatar, prefs: avatarPrefs, sex, age });
+      }
+    }, [myPos, myFacing]);
+
+    // Keyboard movement
+    useEffect(() => {
+      function onKey(e) {
+        if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+        let dx = 0, dy = 0, f = myFacing;
+        if (e.key === "ArrowUp" || e.key === "w") { dy = -1; f = "back"; }
+        if (e.key === "ArrowDown" || e.key === "s") { dy = 1; f = "front"; }
+        if (e.key === "ArrowLeft" || e.key === "a") { dx = -1; f = "left"; }
+        if (e.key === "ArrowRight" || e.key === "d") { dx = 1; f = "right"; }
+        if (dx || dy) {
+          e.preventDefault();
+          setMyPos(p => ({ x: Math.max(0, Math.min(COLS - 1, p.x + dx)), y: Math.max(0, Math.min(ROWS - 1, p.y + dy)) }));
+          setMyFacing(f);
+        }
+      }
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }, [myFacing]);
+
+    // Tap to move (mobile)
+    function handleTap(e) {
+      const rect = worldRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const tx = Math.floor((e.clientX - rect.left) / (rect.width / COLS));
+      const ty = Math.floor((e.clientY - rect.top) / (rect.height / ROWS));
+      const cx = Math.max(0, Math.min(COLS - 1, tx));
+      const cy = Math.max(0, Math.min(ROWS - 1, ty));
+      if (cx !== myPos.x || cy !== myPos.y) {
+        if (cx > myPos.x) setMyFacing("right");
+        else if (cx < myPos.x) setMyFacing("left");
+        else if (cy > myPos.y) setMyFacing("front");
+        else setMyFacing("back");
+        setMyPos({ x: cx, y: cy });
+      }
+    }
+
+    function sendChat() {
+      if (!chatMsg.trim() || !channelRef.current) return;
+      channelRef.current.send({ type: "broadcast", event: "chat", payload: { uid: user.id, name: myName, text: chatMsg.trim() } });
+      setChatBubbles(prev => ({ ...prev, [user.id]: { text: chatMsg.trim(), t: Date.now() } }));
+      setChatLog(prev => [...prev.slice(-50), { name: myName, text: chatMsg.trim(), t: Date.now() }]);
+      setChatMsg("");
+    }
+
+    // Clear old bubbles
+    useEffect(() => {
+      const iv = setInterval(() => {
+        setChatBubbles(prev => {
+          const now = Date.now();
+          const next = {};
+          for (const [k, v] of Object.entries(prev)) { if (now - v.t < 5000) next[k] = v; }
+          return next;
+        });
+      }, 1000);
+      return () => clearInterval(iv);
+    }, []);
+
+    const allPlayers = [
+      { uid: user?.id, x: myPos.x, y: myPos.y, name: myName, facing: myFacing, avatar: myAvatar, prefs: avatarPrefs, isMe: true },
+      ...Object.entries(others).map(([uid, p]) => ({ uid, x: p.x, y: p.y, name: p.name, facing: p.facing || "front", avatar: p.avatar, prefs: p.prefs || {}, sex: p.sex, age: p.age, isMe: false }))
+    ].sort((a, b) => a.y - b.y);
+
+    const fld = { width: "100%", background: "transparent", border: `1px solid ${LINE}`, color: WHITE, padding: 10, fontSize: 11, fontFamily: fontStack, letterSpacing: "0.04em" };
+
+    return (
+      <div style={{ position: "relative", zIndex: 1 }}>
+        {/* Room title */}
+        <div style={{ textAlign: "center", padding: "16px 24px", borderBottom: `1px solid ${LINE}` }}>
+          <span className="up" style={{ fontSize: 12, letterSpacing: "0.22em" }}>Cosmic World</span>
+          <span style={{ color: GREY, fontSize: 10, marginLeft: 12 }}>{allPlayers.length} online</span>
+        </div>
+
+        {/* Room */}
+        <div ref={worldRef} onClick={handleTap} style={{ position: "relative", width: "100%", maxWidth: 760, margin: "0 auto", aspectRatio: `${COLS}/${ROWS}`, background: "#0A0A0E", border: `1px solid ${LINE}`, overflow: "hidden", cursor: "crosshair", touchAction: "none" }}>
+          {/* Grid */}
+          <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+            {[...Array(COLS + 1)].map((_, i) => <line key={`v${i}`} x1={i * TILE} y1={0} x2={i * TILE} y2={H} stroke="rgba(244,244,240,0.04)" strokeWidth="0.5" />)}
+            {[...Array(ROWS + 1)].map((_, i) => <line key={`h${i}`} x1={0} y1={i * TILE} x2={W} y2={i * TILE} stroke="rgba(244,244,240,0.04)" strokeWidth="0.5" />)}
+          </svg>
+
+          {/* Furniture — simple decorations */}
+          {[[2, 1, "🪴"], [12, 2, "🛋️"], [7, 0, "🖼️"], [14, 8, "💡"], [0, 8, "🎵"], [5, 5, "⭐"]].map(([fx, fy, emoji], i) => (
+            <div key={`f${i}`} style={{ position: "absolute", left: `${(fx / COLS) * 100}%`, top: `${(fy / ROWS) * 100}%`, width: `${100 / COLS}%`, height: `${100 / ROWS}%`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(14px, 2.5vw, 24px)", pointerEvents: "none", opacity: 0.5 }}>{emoji}</div>
+          ))}
+
+          {/* Players */}
+          {allPlayers.map(p => {
+            const bubble = chatBubbles[p.uid];
+            return (
+              <div key={p.uid} style={{ position: "absolute", left: `${(p.x / COLS) * 100}%`, top: `${(p.y / ROWS) * 100}%`, width: `${100 / COLS}%`, height: `${100 / ROWS}%`, transition: "left 0.15s ease, top 0.15s ease", zIndex: 10 + p.y, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end" }}>
+                {/* Chat bubble */}
+                {bubble && (
+                  <div style={{ position: "absolute", bottom: "100%", background: WHITE, color: BLACK, padding: "3px 7px", fontSize: "clamp(7px, 1.2vw, 10px)", borderRadius: 6, maxWidth: 120, textAlign: "center", lineHeight: 1.3, whiteSpace: "pre-wrap", wordBreak: "break-word", marginBottom: 2, fontFamily: fontStack, pointerEvents: "none", zIndex: 100 }}>
+                    {bubble.text}
+                    <div style={{ position: "absolute", bottom: -4, left: "50%", transform: "translateX(-50%)", width: 0, height: 0, borderLeft: "4px solid transparent", borderRight: "4px solid transparent", borderTop: `4px solid ${WHITE}` }} />
+                  </div>
+                )}
+                {/* Name */}
+                <div style={{ position: "absolute", top: -14, fontSize: "clamp(6px, 1vw, 8px)", color: p.isMe ? ACCENT : GREY, textTransform: "uppercase", letterSpacing: "0.12em", whiteSpace: "nowrap", pointerEvents: "none", fontFamily: fontStack }}>{p.name}</div>
+                {/* Character — simple pixel block */}
+                <div style={{ width: "70%", aspectRatio: "1", position: "relative" }}>
+                  <PixelAvatar a={p.avatar || myAvatar} prefs={p.prefs || avatarPrefs} facing={p.facing || "front"} sex={p.sex || sex} age={parseInt(p.age || age, 10) || null} size={1} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Chat input */}
+        <div style={{ maxWidth: 760, margin: "0 auto", padding: "12px 24px", borderTop: `1px solid ${LINE}`, display: "flex", gap: 8 }}>
+          <input style={fld} value={chatMsg} onChange={e => setChatMsg(e.target.value)} onKeyDown={e => { if (e.key === "Enter") sendChat(); }} placeholder="Say something…" maxLength={100} />
+          <button className="up" onClick={sendChat} style={{ border: `1px solid ${LINE}`, background: WHITE, color: BLACK, padding: "0 16px", fontSize: 9, fontFamily: fontStack, cursor: "pointer", letterSpacing: "0.12em", whiteSpace: "nowrap" }}>Send</button>
+        </div>
+
+        {/* Chat log */}
+        <div style={{ maxWidth: 760, margin: "0 auto", padding: "8px 24px 80px", maxHeight: 200, overflowY: "auto" }}>
+          {chatLog.slice(-20).map((c, i) => (
+            <div key={i} style={{ fontSize: 11, padding: "3px 0", lineHeight: 1.5 }}>
+              <span style={{ color: ACCENT, fontWeight: 500 }}>{c.name}</span>
+              <span style={{ color: GREY, marginLeft: 8 }}>{c.text}</span>
+            </div>
+          ))}
+          {chatLog.length === 0 && <p className="up" style={{ color: DIM, fontSize: 9, textAlign: "center", padding: "12px 0" }}>Use arrow keys or tap to move · type to chat</p>}
+        </div>
+      </div>
+    );
+  }
 
   // ---------- Friends feed ----------
   function FriendsView() {
