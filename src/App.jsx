@@ -1904,14 +1904,13 @@ export default function CosmicCloset() {
         let cancelled = false;
         (async () => {
           setLoading(true);
-          const results = [];
-          for (const song of playlist.slice(0, 5)) {
+          const results = await Promise.all(playlist.slice(0, 5).map(async (song) => {
             try {
               const res = await fetch(`/api/spotify?q=${encodeURIComponent(song.replace(/—/g, "-"))}`);
               const data = await res.json();
-              results.push({ query: song, ...data });
-            } catch { results.push({ query: song, found: false }); }
-          }
+              return { query: song, ...data };
+            } catch { return { query: song, found: false }; }
+          }));
           if (!cancelled) { setTracks(results); setLoading(false); }
         })();
         return () => { cancelled = true; };
