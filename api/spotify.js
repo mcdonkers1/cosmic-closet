@@ -1,53 +1,68 @@
-// Serverless function: GET /api/spotify?q=Artist - Track
-// Uses Spotify Client Credentials flow (no user auth needed) to search tracks
-// and return preview URLs for 30-second playback.
+// Serverless function: POST /api/spotify
+// Body: { tracks: ["Artist - Track", ...] }
+// Batch search — one token, one request per track, returns all results.
+
+let cachedToken = null;
+let tokenExpiry = 0;
+
+async function getToken(clientId, clientSecret) {
+  if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
+  const res = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: "Basic " + Buffer.from(`${clientId}:${clientSecret}`).toString("base64"),
+    },
+    body: "grant_type=client_credentials",
+  });
+  if (!res.ok) throw new Error("token_failed");
+  const data = await res.json();
+  cachedToken = data.access_token;
+  tokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
+  return cachedToken;
+}
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "GET") return res.status(405).json({ error: "method_not_allowed" });
+  if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
 
   const clientId = process.env.SPOTIFY_CLIENT_ID;
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
   if (!clientId || !clientSecret) return res.status(500).json({ error: "missing_spotify_credentials" });
 
-  const q = (req.query.q || "").trim();
-  if (!q) return res.status(400).json({ error: "missing_query" });
+  let body = req.body;
+  if (typeof body === "string") try { body = JSON.parse(body); } catch { body = {}; }
+  const tracks = body?.tracks;
+  if (!Array.isArray(tracks) || tracks.length === 0) return res.status(400).json({ error: "missing_tracks" });
 
   try {
-    // Get access token via Client Credentials
-    const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: "Basic " + Buffer.from(`${clientId}:${clientSecret}`).toString("base64"),
-      },
-      body: "grant_type=client_credentials",
-    });
-    if (!tokenRes.ok) return res.status(502).json({ error: "token_failed" });
-    const { access_token } = await tokenRes.json();
+    const token = await getToken(clientId, clientSecret);
+    const results = [];
 
-    // Search for track
-    const searchRes = await fetch(
-      `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=1`,
-      { headers: { Authorization: `Bearer ${access_token}` } }
-    );
-    if (!searchRes.ok) return res.status(502).json({ error: "search_failed" });
-    const data = await searchRes.json();
-    const track = data.tracks?.items?.[0];
-    if (!track) return res.status(200).json({ found: false });
+    // Search sequentially with small delay to avoid rate limits
+    for (const q of tracks.slice(0, 5)) {
+      try {
+        const searchRes = await fetch(
+          `https://api.spotify.com/v1/search?q=${encodeURIComponent(q.replace(/—/g, "-").trim())}&type=track&limit=1`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!searchRes.ok) { results.push({ query: q, found: false }); continue; }
+        const data = await searchRes.json();
+        const t = data.tracks?.items?.[0];
+        if (!t) { results.push({ query: q, found: false }); continue; }
+        results.push({
+          query: q, found: true, id: t.id, name: t.name,
+          artist: t.artists?.map(a => a.name).join(", ") || "",
+          image: t.album?.images?.[1]?.url || t.album?.images?.[0]?.url || "",
+          preview_url: t.preview_url,
+          spotify_url: t.external_urls?.spotify || "",
+        });
+      } catch { results.push({ query: q, found: false }); }
+    }
 
-    return res.status(200).json({
-      found: true,
-      id: track.id,
-      name: track.name,
-      artist: track.artists?.map(a => a.name).join(", ") || "",
-      album: track.album?.name || "",
-      image: track.album?.images?.[1]?.url || track.album?.images?.[0]?.url || "",
-      preview_url: track.preview_url,
-      spotify_url: track.external_urls?.spotify || "",
-      uri: track.uri,
-    });
+    return res.status(200).json({ results });
   } catch (e) {
     return res.status(500).json({ error: "server", message: String(e).slice(0, 300) });
   }

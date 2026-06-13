@@ -1789,22 +1789,21 @@ export default function CosmicCloset() {
     };
 
     // Check for interactions when player moves onto furniture
-    const prevPos = useRef(myPos);
     useEffect(() => {
       const furn = (FURNITURE[room] || []);
-      const hit = furn.find(f => f.action && myPos.x >= f.x && myPos.x < f.x + f.w && myPos.y >= f.y && myPos.y < f.y + f.h);
-      if (hit?.action === "dj" && reading?.playlist) {
-        setInteracting({ type: "dj", playlist: reading.playlist });
+      const onDJ = furn.some(f => f.action === "dj" && myPos.x >= f.x && myPos.x < f.x + f.w && myPos.y >= f.y && myPos.y < f.y + f.h);
+      if (onDJ && reading?.playlist) {
+        if (!interacting || interacting.type !== "dj") {
+          setInteracting({ type: "dj", playlist: reading.playlist });
+        }
         // Stop idle wandering while at DJ booth
         if (wanderInterval.current) { clearInterval(wanderInterval.current); wanderInterval.current = null; }
         if (idleTimer.current) { clearTimeout(idleTimer.current); idleTimer.current = null; }
-      } else if (interacting && (prevPos.current.x !== myPos.x || prevPos.current.y !== myPos.y)) {
-        // Only clear interaction when user actively moves away
+      } else if (interacting) {
         setInteracting(null);
         resetIdle();
       }
-      prevPos.current = myPos;
-    }, [myPos, room]);
+    }, [myPos.x, myPos.y, room]);
 
     // Realtime presence per room
     useEffect(() => {
@@ -1914,17 +1913,19 @@ export default function CosmicCloset() {
         let cancelled = false;
         (async () => {
           setLoading(true);
-          const results = await Promise.all(playlist.slice(0, 5).map(async (song) => {
-            try {
-              const res = await fetch(`/api/spotify?q=${encodeURIComponent(song.replace(/—/g, "-"))}`);
-              const data = await res.json();
-              return { query: song, ...data };
-            } catch { return { query: song, found: false }; }
-          }));
-          if (!cancelled) { setTracks(results); setLoading(false); }
+          try {
+            const res = await fetch("/api/spotify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ tracks: playlist.slice(0, 5) }),
+            });
+            const data = await res.json();
+            if (!cancelled && data.results) { setTracks(data.results); }
+          } catch {}
+          if (!cancelled) setLoading(false);
         })();
         return () => { cancelled = true; };
-      }, [playlist]);
+      }, [playlist.join(",")]);
 
       function togglePlay(idx) {
         const t = tracks[idx];
