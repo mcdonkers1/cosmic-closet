@@ -1692,10 +1692,16 @@ export default function CosmicCloset() {
     </div>
   );
 
-  // ---------- Cosmic World — multiplayer room ----------
+  // ---------- Cosmic World — multiplayer rooms ----------
   function CosmicWorld() {
-    const COLS = 10, ROWS = 8;
-    const [myPos, setMyPos] = useState({ x: Math.floor(Math.random() * COLS), y: Math.floor(Math.random() * ROWS) });
+    const COLS = 10, ROWS = 7;
+    const ROOMS = {
+      studio: { name: "Streetwear Studio", wall: "linear-gradient(180deg, #1A1A2E 0%, #16213E 100%)", floor1: "#1E1E30", floor2: "#252540", accent: "#C9F24D" },
+      bedroom: { name: "The Bedroom", wall: "linear-gradient(180deg, #2A1A2E 0%, #1E1630 100%)", floor1: "#2A2030", floor2: "#322840", accent: "#E8A0E8" },
+      rooftop: { name: "Rooftop Lounge", wall: "linear-gradient(180deg, #0A0E2A 0%, #141830 100%)", floor1: "#1A1A28", floor2: "#222230", accent: "#6AE4FF" },
+    };
+    const [room, setRoom] = useState("studio");
+    const [myPos, setMyPos] = useState({ x: 4, y: 3 });
     const [others, setOthers] = useState({});
     const [chatMsg, setChatMsg] = useState("");
     const [chatBubbles, setChatBubbles] = useState({});
@@ -1703,49 +1709,92 @@ export default function CosmicCloset() {
     const [myFacing, setMyFacing] = useState("front");
     const channelRef = useRef(null);
     const worldRef = useRef(null);
+    const R = ROOMS[room];
 
     const myName = displayName || user?.email?.split("@")[0] || "Anon";
     const myAvatar = reading && sign ? deriveAvatar(reading, sign) : { top: "tee", topColor: "#444", bottom: "jeans", bottomColor: "#2A3A5A", shoes: "sneakers", shoeColor: "#222" };
 
-    // Supabase Realtime presence
+    // Pixel furniture SVGs
+    function PxCouch({ color = "#3A3A5A" }) {
+      return <svg viewBox="0 0 40 24" style={{ width: "100%", height: "100%" }}><rect x="2" y="8" width="36" height="14" rx="2" fill={color}/><rect x="0" y="6" width="8" height="16" rx="2" fill={color} opacity="0.8"/><rect x="32" y="6" width="8" height="16" rx="2" fill={color} opacity="0.8"/><rect x="4" y="4" width="32" height="6" rx="1" fill={color} filter="brightness(1.3)"/><rect x="6" y="10" width="12" height="8" rx="1" fill={color} filter="brightness(0.85)"/><rect x="22" y="10" width="12" height="8" rx="1" fill={color} filter="brightness(0.85)"/><rect x="2" y="20" width="4" height="4" fill="#222"/><rect x="34" y="20" width="4" height="4" fill="#222"/></svg>;
+    }
+    function PxRack() {
+      return <svg viewBox="0 0 32 40" style={{ width: "100%", height: "100%" }}><rect x="2" y="0" width="2" height="40" fill="#555"/><rect x="28" y="0" width="2" height="40" fill="#555"/><rect x="4" y="0" width="24" height="2" fill="#666"/><line x1="8" y1="2" x2="8" y2="14" stroke="#C9F24D" strokeWidth="1.5"/><line x1="14" y1="2" x2="14" y2="18" stroke="#E06" strokeWidth="1.5"/><line x1="20" y1="2" x2="20" y2="12" stroke="#4AF" strokeWidth="1.5"/><line x1="26" y1="2" x2="26" y2="16" stroke="#FFA" strokeWidth="1.5"/><rect x="6" y="14" width="4" height="6" fill="#C9F24D" opacity="0.7" rx="1"/><rect x="12" y="18" width="4" height="8" fill="#E06" opacity="0.7" rx="1"/><rect x="18" y="12" width="4" height="10" fill="#4AF" opacity="0.7" rx="1"/><rect x="24" y="16" width="4" height="6" fill="#FFA" opacity="0.7" rx="1"/></svg>;
+    }
+    function PxMirror() {
+      return <svg viewBox="0 0 20 32" style={{ width: "100%", height: "100%" }}><rect x="2" y="0" width="16" height="28" rx="2" fill="#2A2A4A" stroke="#4A4680" strokeWidth="1"/><rect x="4" y="2" width="12" height="24" fill="linear-gradient(#1a1a3a, #2a2a5a)" rx="1"/><rect x="4" y="2" width="12" height="24" fill="#1E1E3E" rx="1"/><rect x="5" y="3" width="4" height="8" fill="rgba(255,255,255,0.06)" rx="1"/><rect x="8" y="28" width="4" height="4" fill="#3A3A5A"/></svg>;
+    }
+    function PxSneakerShelf() {
+      return <svg viewBox="0 0 36 32" style={{ width: "100%", height: "100%" }}><rect x="0" y="0" width="36" height="32" fill="#2A2A3A" rx="1"/><rect x="0" y="10" width="36" height="2" fill="#3A3A4A"/><rect x="0" y="20" width="36" height="2" fill="#3A3A4A"/><rect x="3" y="3" width="10" height="6" fill="#E06" rx="1"/><rect x="16" y="3" width="10" height="6" fill="#FFF" rx="1"/><rect x="3" y="13" width="10" height="6" fill="#333" rx="1"/><rect x="16" y="13" width="10" height="6" fill="#C9F24D" rx="1"/><rect x="3" y="23" width="10" height="6" fill="#4AF" rx="1"/><rect x="16" y="23" width="10" height="6" fill="#F90" rx="1"/></svg>;
+    }
+    function PxDJBooth() {
+      return <svg viewBox="0 0 40 28" style={{ width: "100%", height: "100%" }}><rect x="0" y="8" width="40" height="20" fill="#1A1A2A" rx="2"/><rect x="2" y="10" width="16" height="16" fill="#111" rx="1"/><circle cx="10" cy="18" r="6" fill="#222" stroke="#444" strokeWidth="1"/><circle cx="10" cy="18" r="2" fill="#C9F24D"/><rect x="22" y="10" width="16" height="8" fill="#111" rx="1"/><rect x="24" y="12" width="3" height="4" fill="#E06" rx="1"/><rect x="29" y="12" width="3" height="4" fill="#4AF" rx="1"/><rect x="34" y="12" width="3" height="4" fill="#C9F24D" rx="1"/><rect x="22" y="20" width="16" height="6" fill="#1A1A2A"/><rect x="24" y="21" width="12" height="1" fill="#333"/><rect x="24" y="23" width="12" height="1" fill="#333"/></svg>;
+    }
+    function PxBed({ color = "#3A2A4A" }) {
+      return <svg viewBox="0 0 48 28" style={{ width: "100%", height: "100%" }}><rect x="0" y="6" width="48" height="22" fill={color} rx="2"/><rect x="0" y="0" width="48" height="10" fill={color} filter="brightness(1.2)" rx="2"/><rect x="2" y="2" width="14" height="6" fill="#FFF" opacity="0.15" rx="1"/><rect x="18" y="2" width="14" height="6" fill="#FFF" opacity="0.1" rx="1"/><rect x="2" y="12" width="44" height="14" fill={color} filter="brightness(0.85)"/><rect x="0" y="24" width="4" height="4" fill="#222"/><rect x="44" y="24" width="4" height="4" fill="#222"/></svg>;
+    }
+    function PxPlant() {
+      return <svg viewBox="0 0 16 28" style={{ width: "100%", height: "100%" }}><rect x="4" y="18" width="8" height="10" fill="#4A3A2A" rx="1"/><ellipse cx="8" cy="12" rx="6" ry="8" fill="#2A5A2A"/><ellipse cx="6" cy="10" rx="3" ry="5" fill="#3A7A3A"/><ellipse cx="10" cy="14" rx="3" ry="4" fill="#2A6A2A"/><circle cx="7" cy="8" r="1" fill="#C9F24D" opacity="0.5"/></svg>;
+    }
+    function PxStarSky() {
+      return <svg viewBox="0 0 100 40" style={{ width: "100%", height: "100%" }}><rect width="100" height="40" fill="transparent"/>{[...Array(20)].map((_,i)=><circle key={i} cx={(i*37)%100} cy={(i*23)%40} r={i%5===0?1.5:0.8} fill={i%4===0?"#C9F24D":"#FFF"} opacity={i%3===0?0.8:0.3}/>)}<circle cx="85" cy="8" r="4" fill="#FFF" opacity="0.15"/></svg>;
+    }
+    function PxBarCounter() {
+      return <svg viewBox="0 0 48 20" style={{ width: "100%", height: "100%" }}><rect x="0" y="4" width="48" height="16" fill="#2A2A3A" rx="2"/><rect x="0" y="0" width="48" height="6" fill="#3A3A4A" rx="2"/><rect x="4" y="1" width="4" height="3" fill="#6AE4FF" rx="1" opacity="0.6"/><rect x="12" y="1" width="4" height="3" fill="#E8A0E8" rx="1" opacity="0.6"/><rect x="20" y="1" width="4" height="3" fill="#C9F24D" rx="1" opacity="0.6"/></svg>;
+    }
+
+    // Room furniture layouts
+    const FURNITURE = {
+      studio: [
+        { x: 0, y: 0, w: 2, h: 1, comp: <PxCouch color="#3A3A5A" />, label: "Couch" },
+        { x: 8, y: 0, w: 2, h: 2, comp: <PxRack />, label: "Clothing rack" },
+        { x: 0, y: 3, w: 1, h: 2, comp: <PxMirror />, label: "Mirror" },
+        { x: 5, y: 0, w: 2, h: 1, comp: <PxSneakerShelf />, label: "Sneaker shelf" },
+        { x: 3, y: 5, w: 2, h: 1, comp: <PxDJBooth />, label: "DJ booth" },
+        { x: 9, y: 5, w: 1, h: 1, comp: <PxPlant />, label: "Plant" },
+        { x: 0, y: 6, w: 1, h: 1, comp: <PxPlant />, label: "Plant" },
+      ],
+      bedroom: [
+        { x: 0, y: 0, w: 3, h: 1, comp: <PxBed color="#4A2A5A" />, label: "Bed" },
+        { x: 9, y: 0, w: 1, h: 1, comp: <PxPlant />, label: "Plant" },
+        { x: 8, y: 2, w: 1, h: 2, comp: <PxMirror />, label: "Mirror" },
+        { x: 0, y: 5, w: 2, h: 1, comp: <PxSneakerShelf />, label: "Dresser" },
+        { x: 5, y: 0, w: 2, h: 1, comp: <PxCouch color="#4A2A5A" />, label: "Loveseat" },
+      ],
+      rooftop: [
+        { x: 0, y: 0, w: 3, h: 1, comp: <PxBarCounter />, label: "Bar" },
+        { x: 7, y: 0, w: 2, h: 1, comp: <PxCouch color="#2A3A4A" />, label: "Outdoor couch" },
+        { x: 0, y: 5, w: 1, h: 1, comp: <PxPlant />, label: "Plant" },
+        { x: 9, y: 5, w: 1, h: 1, comp: <PxPlant />, label: "Plant" },
+        { x: 4, y: 3, w: 2, h: 1, comp: <PxDJBooth />, label: "Sound system" },
+      ],
+    };
+
+    // Realtime presence per room
     useEffect(() => {
       if (!supabaseReady || !user || !supabase) return;
-      const ch = supabase.channel("cosmic-world", { config: { presence: { key: user.id } } });
+      const ch = supabase.channel(`world-${room}`, { config: { presence: { key: user.id } } });
       channelRef.current = ch;
-
       ch.on("presence", { event: "sync" }, () => {
         const state = ch.presenceState();
         const o = {};
-        for (const [uid, arr] of Object.entries(state)) {
-          if (uid === user.id) continue;
-          const p = arr[0];
-          if (p) o[uid] = p;
-        }
+        for (const [uid, arr] of Object.entries(state)) { if (uid !== user.id && arr[0]) o[uid] = arr[0]; }
         setOthers(o);
       });
-
       ch.on("broadcast", { event: "chat" }, ({ payload }) => {
         setChatBubbles(prev => ({ ...prev, [payload.uid]: { text: payload.text, t: Date.now() } }));
         setChatLog(prev => [...prev.slice(-50), { name: payload.name, text: payload.text, t: Date.now() }]);
       });
-
       ch.subscribe(async (status) => {
-        if (status === "SUBSCRIBED") {
-          await ch.track({ x: myPos.x, y: myPos.y, name: myName, facing: "front", avatar: myAvatar, prefs: avatarPrefs, sex, age });
-        }
+        if (status === "SUBSCRIBED") await ch.track({ x: myPos.x, y: myPos.y, name: myName, facing: "front", avatar: myAvatar, prefs: avatarPrefs, sex, age });
       });
-
       return () => { ch.unsubscribe(); };
-    }, [user]);
+    }, [user, room]);
 
-    // Track position changes
     useEffect(() => {
-      if (channelRef.current && user) {
-        channelRef.current.track({ x: myPos.x, y: myPos.y, name: myName, facing: myFacing, avatar: myAvatar, prefs: avatarPrefs, sex, age });
-      }
+      if (channelRef.current && user) channelRef.current.track({ x: myPos.x, y: myPos.y, name: myName, facing: myFacing, avatar: myAvatar, prefs: avatarPrefs, sex, age });
     }, [myPos, myFacing]);
 
-    // Keyboard movement
     useEffect(() => {
       function onKey(e) {
         if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
@@ -1754,29 +1803,20 @@ export default function CosmicCloset() {
         if (e.key === "ArrowDown" || e.key === "s") { dy = 1; f = "front"; }
         if (e.key === "ArrowLeft" || e.key === "a") { dx = -1; f = "left"; }
         if (e.key === "ArrowRight" || e.key === "d") { dx = 1; f = "right"; }
-        if (dx || dy) {
-          e.preventDefault();
-          setMyPos(p => ({ x: Math.max(0, Math.min(COLS - 1, p.x + dx)), y: Math.max(0, Math.min(ROWS - 1, p.y + dy)) }));
-          setMyFacing(f);
-        }
+        if (dx || dy) { e.preventDefault(); setMyPos(p => ({ x: Math.max(0, Math.min(COLS - 1, p.x + dx)), y: Math.max(0, Math.min(ROWS - 1, p.y + dy)) })); setMyFacing(f); }
       }
       window.addEventListener("keydown", onKey);
       return () => window.removeEventListener("keydown", onKey);
     }, [myFacing]);
 
-    // Tap to move (mobile)
     function handleTap(e) {
-      const rect = worldRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const tx = Math.floor((e.clientX - rect.left) / (rect.width / COLS));
-      const ty = Math.floor((e.clientY - rect.top) / (rect.height / ROWS));
-      const cx = Math.max(0, Math.min(COLS - 1, tx));
-      const cy = Math.max(0, Math.min(ROWS - 1, ty));
+      const floorEl = e.currentTarget;
+      const rect = floorEl.getBoundingClientRect();
+      const cx = Math.max(0, Math.min(COLS - 1, Math.floor((e.clientX - rect.left) / (rect.width / COLS))));
+      const cy = Math.max(0, Math.min(ROWS - 1, Math.floor((e.clientY - rect.top) / (rect.height / ROWS))));
       if (cx !== myPos.x || cy !== myPos.y) {
-        if (cx > myPos.x) setMyFacing("right");
-        else if (cx < myPos.x) setMyFacing("left");
-        else if (cy > myPos.y) setMyFacing("front");
-        else setMyFacing("back");
+        if (cx > myPos.x) setMyFacing("right"); else if (cx < myPos.x) setMyFacing("left");
+        else if (cy > myPos.y) setMyFacing("front"); else setMyFacing("back");
         setMyPos({ x: cx, y: cy });
       }
     }
@@ -1789,16 +1829,10 @@ export default function CosmicCloset() {
       setChatMsg("");
     }
 
-    // Clear old bubbles
+    function switchRoom(r) { setRoom(r); setMyPos({ x: 4, y: 3 }); setOthers({}); setChatLog([]); setChatBubbles({}); }
+
     useEffect(() => {
-      const iv = setInterval(() => {
-        setChatBubbles(prev => {
-          const now = Date.now();
-          const next = {};
-          for (const [k, v] of Object.entries(prev)) { if (now - v.t < 5000) next[k] = v; }
-          return next;
-        });
-      }, 1000);
+      const iv = setInterval(() => { setChatBubbles(prev => { const now = Date.now(); const n = {}; for (const [k, v] of Object.entries(prev)) { if (now - v.t < 5000) n[k] = v; } return n; }); }, 1000);
       return () => clearInterval(iv);
     }, []);
 
@@ -1808,69 +1842,51 @@ export default function CosmicCloset() {
     ].sort((a, b) => a.y - b.y);
 
     const fld = { width: "100%", background: "transparent", border: `1px solid ${LINE}`, color: WHITE, padding: 10, fontSize: 11, fontFamily: fontStack, letterSpacing: "0.04em" };
+    const furniture = FURNITURE[room] || [];
 
     return (
       <div style={{ position: "relative", zIndex: 1 }}>
-        {/* Room title */}
-        <div style={{ textAlign: "center", padding: "16px 24px", borderBottom: `1px solid ${LINE}` }}>
-          <span className="up" style={{ fontSize: 12, letterSpacing: "0.22em" }}>Cosmic World</span>
-          <span style={{ color: GREY, fontSize: 10, marginLeft: 12 }}>{allPlayers.length} online</span>
+        {/* Room header + nav */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 24px", borderBottom: `1px solid ${LINE}`, flexWrap: "wrap", gap: 8 }}>
+          <div>
+            <span className="up" style={{ fontSize: 12, letterSpacing: "0.22em" }}>Cosmic World</span>
+            <span style={{ color: GREY, fontSize: 10, marginLeft: 10 }}>{allPlayers.length} online</span>
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {Object.entries(ROOMS).map(([key, r]) => (
+              <button key={key} className="up" onClick={() => switchRoom(key)} style={{ background: room === key ? r.accent : "transparent", color: room === key ? BLACK : GREY, border: `1px solid ${room === key ? r.accent : LINE}`, padding: "5px 10px", fontSize: 8, fontFamily: fontStack, cursor: "pointer", letterSpacing: "0.1em" }}>{r.name}</button>
+            ))}
+          </div>
         </div>
 
-        {/* Room — full width, tall */}
-        <div ref={worldRef} onClick={handleTap} style={{ position: "relative", width: "100%", height: "max(70vh, 500px)", overflow: "hidden", cursor: "crosshair", touchAction: "none", background: "#1E1E2A" }}>
-          {/* Wall — top 18% */}
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "18%", background: "linear-gradient(180deg, #2D2B55 0%, #1E1B4B 60%, #1A1840 100%)" }}>
-            {/* Baseboard */}
-            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 4, background: "#3D3A6A" }} />
-            {/* Window */}
-            <div style={{ position: "absolute", left: "5%", top: "12%", width: "18%", height: "75%", background: "linear-gradient(180deg, #1a1a3a 0%, #2a2a5a 100%)", border: "3px solid #4A4680", borderRadius: 4, overflow: "hidden" }}>
-              <div style={{ position: "absolute", inset: 3, background: "linear-gradient(180deg, #0D0B2E 0%, #1A1840 50%, #2D2860 100%)" }}>
-                <div style={{ position: "absolute", top: "15%", left: "20%", width: 4, height: 4, background: "#C9F24D", borderRadius: "50%", boxShadow: "0 0 6px #C9F24D" }} />
-                <div style={{ position: "absolute", top: "25%", right: "30%", width: 3, height: 3, background: "#F4F4F0", borderRadius: "50%", opacity: 0.5 }} />
-                <div style={{ position: "absolute", top: "40%", left: "50%", width: 2, height: 2, background: "#F4F4F0", borderRadius: "50%", opacity: 0.3 }} />
-              </div>
-              <div style={{ position: "absolute", top: 0, bottom: 0, left: "50%", width: 2, background: "#4A4680" }} />
-              <div style={{ position: "absolute", left: 0, right: 0, top: "50%", height: 2, background: "#4A4680" }} />
-            </div>
-            {/* Poster */}
-            <div style={{ position: "absolute", left: "32%", top: "10%", width: "14%", height: "72%", background: "#0D0D1A", border: "2px solid #3A3860", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <span style={{ fontSize: "clamp(16px, 2.5vw, 28px)" }}>✦</span>
-            </div>
-            {/* Shelf */}
-            <div style={{ position: "absolute", left: "55%", top: "30%", width: "20%", height: 3, background: "#4A4680" }}>
-              <div style={{ position: "absolute", top: -14, left: "10%", fontSize: "clamp(10px, 1.5vw, 16px)" }}>🪴</div>
-              <div style={{ position: "absolute", top: -12, right: "15%", fontSize: "clamp(8px, 1.2vw, 14px)" }}>📚</div>
-            </div>
-            {/* Clock */}
-            <div style={{ position: "absolute", right: "8%", top: "15%", width: "8%", aspectRatio: "1", borderRadius: "50%", border: "2px solid #4A4680", background: "#0D0D1A", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(8px, 1.2vw, 14px)", color: ACCENT }}>⏰</div>
+        {/* Room */}
+        <div style={{ position: "relative", width: "100%", height: "max(75vh, 550px)", overflow: "hidden", background: R.floor1 }}>
+          {/* Wall */}
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "20%", background: R.wall, zIndex: 1 }}>
+            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 5, background: "rgba(255,255,255,0.08)" }} />
+            {room === "rooftop" && <PxStarSky />}
+            {room === "studio" && <>
+              <div style={{ position: "absolute", left: "6%", top: "10%", width: "16%", height: "75%", background: "#0D0D1A", border: "2px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ color: R.accent, fontSize: "clamp(14px, 2vw, 24px)", fontWeight: 700, fontFamily: fontStack }}>CC</span></div>
+              <div style={{ position: "absolute", left: "28%", top: "10%", width: "16%", height: "75%", background: "#0D0D1A", border: "2px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: "clamp(16px, 2.5vw, 28px)" }}>✦</span></div>
+              <div style={{ position: "absolute", right: "6%", top: "10%", width: "22%", height: "75%", background: "#0D0D1A", border: "2px solid rgba(255,255,255,0.1)", overflow: "hidden" }}><div style={{ position: "absolute", inset: 3, background: "linear-gradient(135deg, #E06 0%, #C9F24D 50%, #4AF 100%)", opacity: 0.3 }} /></div>
+            </>}
+            {room === "bedroom" && <>
+              <div style={{ position: "absolute", left: "10%", top: "8%", width: "20%", height: "80%", background: "#0D0D1A", border: "2px solid rgba(255,255,255,0.08)", borderRadius: 4, overflow: "hidden" }}><div style={{ position: "absolute", inset: 3, background: "linear-gradient(180deg, #0D0B2E, #2D2860)" }}><circle cx="50%" cy="30%" r="3" fill="#FFF" opacity="0.4" /><circle cx="30%" cy="50%" r="2" fill="#E8A0E8" opacity="0.3" /></div></div>
+              <div style={{ position: "absolute", right: "10%", top: "15%", width: "10%", height: "60%", background: "#0D0D1A", border: "2px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: "60%", height: "60%", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.15)" }} /></div>
+            </>}
           </div>
 
-          {/* Floor — bottom 82% */}
-          <div style={{ position: "absolute", top: "18%", left: 0, right: 0, bottom: 0, overflow: "hidden" }}>
-            {/* Checkerboard floor */}
+          {/* Floor area */}
+          <div ref={worldRef} onClick={handleTap} style={{ position: "absolute", top: "20%", left: 0, right: 0, bottom: 0, cursor: "crosshair", touchAction: "none" }}>
+            {/* Checkerboard */}
             {[...Array(COLS * ROWS)].map((_, i) => {
               const col = i % COLS, row = Math.floor(i / COLS);
-              const dark = (col + row) % 2 === 0;
-              return <div key={i} style={{ position: "absolute", left: `${(col / COLS) * 100}%`, top: `${(row / ROWS) * 100}%`, width: `${100 / COLS}%`, height: `${100 / ROWS}%`, background: dark ? "#1C1C2E" : "#222238", borderRight: "1px solid rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.03)" }} />;
+              return <div key={i} style={{ position: "absolute", left: `${(col / COLS) * 100}%`, top: `${(row / ROWS) * 100}%`, width: `${100 / COLS}%`, height: `${100 / ROWS}%`, background: (col + row) % 2 === 0 ? R.floor1 : R.floor2, borderRight: "1px solid rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.02)" }} />;
             })}
 
-            {/* Rug */}
-            <div style={{ position: "absolute", left: `${(3 / COLS) * 100}%`, top: `${(2 / ROWS) * 100}%`, width: `${(4 / COLS) * 100}%`, height: `${(3 / ROWS) * 100}%`, background: "rgba(201,242,77,0.06)", border: `1px solid rgba(201,242,77,0.12)`, borderRadius: 4, pointerEvents: "none", zIndex: 1 }} />
-
-            {/* Furniture on floor */}
-            {[
-              [0, 0, "🛋️", "clamp(28px, 5vw, 48px)"],
-              [1, 0, "🛋️", "clamp(28px, 5vw, 48px)"],
-              [9, 0, "🪴", "clamp(24px, 4vw, 40px)"],
-              [0, 7, "🎵", "clamp(24px, 4vw, 40px)"],
-              [9, 7, "💡", "clamp(24px, 4vw, 40px)"],
-              [4, 1, "☕", "clamp(20px, 3vw, 32px)"],
-              [5, 1, "🍕", "clamp(20px, 3vw, 32px)"],
-              [8, 3, "🖥️", "clamp(24px, 4vw, 40px)"],
-              [8, 4, "🪑", "clamp(20px, 3vw, 32px)"],
-            ].map(([fx, fy, emoji, sz], i) => (
-              <div key={`f${i}`} style={{ position: "absolute", left: `${(fx / COLS) * 100}%`, top: `${(fy / ROWS) * 100}%`, width: `${100 / COLS}%`, height: `${100 / ROWS}%`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: sz, pointerEvents: "none", zIndex: 4 + fy, filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.4))" }}>{emoji}</div>
+            {/* Furniture */}
+            {furniture.map((f, i) => (
+              <div key={`f${i}`} title={f.label} style={{ position: "absolute", left: `${(f.x / COLS) * 100}%`, top: `${(f.y / ROWS) * 100}%`, width: `${(f.w / COLS) * 100}%`, height: `${(f.h / ROWS) * 100}%`, pointerEvents: "none", zIndex: 4 + f.y, padding: "4%" }}>{f.comp}</div>
             ))}
 
             {/* Players */}
@@ -1878,19 +1894,15 @@ export default function CosmicCloset() {
               const bubble = chatBubbles[p.uid];
               return (
                 <div key={p.uid} style={{ position: "absolute", left: `${(p.x / COLS) * 100}%`, top: `${(p.y / ROWS) * 100}%`, width: `${100 / COLS}%`, height: `${100 / ROWS}%`, transition: "left 0.18s ease, top 0.18s ease", zIndex: 10 + p.y }}>
-                  {/* Chat bubble */}
                   {bubble && (
                     <div style={{ position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)", background: WHITE, color: BLACK, padding: "6px 10px", fontSize: 11, borderRadius: 10, maxWidth: 160, textAlign: "center", lineHeight: 1.4, whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: fontStack, pointerEvents: "none", zIndex: 100, boxShadow: "0 4px 12px rgba(0,0,0,0.5)", marginBottom: 4 }}>
                       {bubble.text}
                       <div style={{ position: "absolute", bottom: -6, left: "50%", transform: "translateX(-50%)", width: 0, height: 0, borderLeft: "6px solid transparent", borderRight: "6px solid transparent", borderTop: `6px solid ${WHITE}` }} />
                     </div>
                   )}
-                  {/* Name tag */}
-                  <div style={{ position: "absolute", top: -18, left: "50%", transform: "translateX(-50%)", fontSize: 9, color: p.isMe ? BLACK : WHITE, background: p.isMe ? ACCENT : "rgba(0,0,0,0.6)", padding: "2px 6px", borderRadius: 3, textTransform: "uppercase", letterSpacing: "0.1em", whiteSpace: "nowrap", pointerEvents: "none", fontFamily: fontStack, fontWeight: 600 }}>{p.name}</div>
-                  {/* Shadow */}
-                  <div style={{ position: "absolute", bottom: "2%", left: "15%", width: "70%", height: "10%", background: "rgba(0,0,0,0.35)", borderRadius: "50%", filter: "blur(2px)" }} />
-                  {/* Character */}
-                  <div style={{ position: "absolute", top: "-30%", left: "5%", right: "5%", bottom: "5%", overflow: "hidden" }}>
+                  <div style={{ position: "absolute", top: -20, left: "50%", transform: "translateX(-50%)", fontSize: 9, color: p.isMe ? BLACK : WHITE, background: p.isMe ? R.accent : "rgba(0,0,0,0.7)", padding: "2px 8px", borderRadius: 4, textTransform: "uppercase", letterSpacing: "0.1em", whiteSpace: "nowrap", pointerEvents: "none", fontFamily: fontStack, fontWeight: 600, zIndex: 50 }}>{p.name}</div>
+                  <div style={{ position: "absolute", bottom: "2%", left: "15%", width: "70%", height: "8%", background: "rgba(0,0,0,0.3)", borderRadius: "50%", filter: "blur(2px)" }} />
+                  <div style={{ position: "absolute", top: "-40%", left: "0%", right: "0%", bottom: "0%", overflow: "visible" }}>
                     <PixelAvatar a={p.avatar || myAvatar} prefs={{ ...(p.prefs || avatarPrefs), scene: "void" }} facing={p.facing || "front"} sex={p.sex || sex} age={parseInt(p.age || age, 10) || null} />
                   </div>
                 </div>
@@ -1899,21 +1911,19 @@ export default function CosmicCloset() {
           </div>
         </div>
 
-        {/* Chat input */}
-        <div style={{ maxWidth: 760, margin: "0 auto", padding: "12px 24px", borderTop: `1px solid ${LINE}`, display: "flex", gap: 8 }}>
+        {/* Chat */}
+        <div style={{ display: "flex", gap: 8, padding: "12px 24px", borderTop: `1px solid ${LINE}` }}>
           <input style={fld} value={chatMsg} onChange={e => setChatMsg(e.target.value)} onKeyDown={e => { if (e.key === "Enter") sendChat(); }} placeholder="Say something…" maxLength={100} />
-          <button className="up" onClick={sendChat} style={{ border: `1px solid ${LINE}`, background: WHITE, color: BLACK, padding: "0 16px", fontSize: 9, fontFamily: fontStack, cursor: "pointer", letterSpacing: "0.12em", whiteSpace: "nowrap" }}>Send</button>
+          <button className="up" onClick={sendChat} style={{ border: `1px solid ${LINE}`, background: R.accent, color: BLACK, padding: "0 16px", fontSize: 9, fontFamily: fontStack, cursor: "pointer", letterSpacing: "0.12em", whiteSpace: "nowrap", fontWeight: 600 }}>Send</button>
         </div>
-
-        {/* Chat log */}
-        <div style={{ maxWidth: 760, margin: "0 auto", padding: "8px 24px 80px", maxHeight: 200, overflowY: "auto" }}>
+        <div style={{ padding: "4px 24px 60px", maxHeight: 160, overflowY: "auto" }}>
           {chatLog.slice(-20).map((c, i) => (
             <div key={i} style={{ fontSize: 11, padding: "3px 0", lineHeight: 1.5 }}>
-              <span style={{ color: ACCENT, fontWeight: 500 }}>{c.name}</span>
+              <span style={{ color: R.accent, fontWeight: 500 }}>{c.name}</span>
               <span style={{ color: GREY, marginLeft: 8 }}>{c.text}</span>
             </div>
           ))}
-          {chatLog.length === 0 && <p className="up" style={{ color: DIM, fontSize: 9, textAlign: "center", padding: "12px 0" }}>Use arrow keys or tap to move · type to chat</p>}
+          {chatLog.length === 0 && <p className="up" style={{ color: DIM, fontSize: 9, textAlign: "center", padding: "8px 0" }}>Arrow keys / WASD to move · type to chat · tap tiles on mobile</p>}
         </div>
       </div>
     );
