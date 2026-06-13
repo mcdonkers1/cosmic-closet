@@ -1714,143 +1714,87 @@ export default function CosmicCloset() {
     const myName = displayName || user?.email?.split("@")[0] || "Anon";
     const myAvatar = reading && sign ? deriveAvatar(reading, sign) : { top: "tee", topColor: "#444", bottom: "jeans", bottomColor: "#2A3A5A", shoes: "sneakers", shoeColor: "#222" };
 
-    // Pixel furniture — canvas-rendered like PixelAvatar
-    function PixelFurniture({ type, color }) {
-      const canvasRef = useRef(null);
-      useEffect(() => {
-        const c = canvasRef.current; if (!c) return;
-        const ctx = c.getContext("2d");
-        const S = 2; // pixel size
-        ctx.clearRect(0, 0, c.width, c.height);
-        const px = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * S, y * S, w * S, h * S); };
-        const shade = (hex, f) => { const n = parseInt(hex.slice(1), 16); const r = Math.min(255, Math.round(((n >> 16) & 255) * f)), g = Math.min(255, Math.round(((n >> 8) & 255) * f)), b = Math.min(255, Math.round((n & 255) * f)); return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`; };
+    // Pixel furniture — SVG pixel blocks
+    const P = (x, y, w, h, fill) => <rect key={`${x}${y}${fill}`} x={x} y={y} width={w} height={h} fill={fill} />;
+    function PxF({ children, vw, vh }) { return <svg viewBox={`0 0 ${vw} ${vh}`} style={{ width: "100%", height: "100%" }} xmlns="http://www.w3.org/2000/svg">{children}</svg>; }
 
-        if (type === "couch") {
-          const base = color || "#6A5ACD"; const dk = shade(base, 0.7); const lt = shade(base, 1.3);
-          // legs
-          px(1, 14, 2, 2, "#2A2A2A"); px(17, 14, 2, 2, "#2A2A2A");
-          // base
-          px(0, 6, 20, 8, base); px(1, 7, 18, 6, dk);
-          // arms
-          px(0, 4, 3, 10, base); px(17, 4, 3, 10, base); px(0, 4, 3, 2, lt); px(17, 4, 3, 2, lt);
-          // back
-          px(3, 2, 14, 4, lt); px(4, 3, 12, 2, shade(lt, 0.9));
-          // cushions
-          px(4, 7, 5, 5, shade(base, 0.85)); px(11, 7, 5, 5, shade(base, 0.85));
-          px(4, 7, 5, 1, shade(base, 1.1)); px(11, 7, 5, 1, shade(base, 1.1));
-          // pillow
-          px(5, 4, 3, 2, "#E06"); px(12, 4, 3, 2, "#4AF");
-        }
-        else if (type === "rack") {
-          // poles
-          px(1, 0, 1, 20, "#888"); px(18, 0, 1, 20, "#888");
-          // bar
-          px(2, 1, 16, 1, "#AAA"); px(2, 0, 16, 1, "#999");
-          // hangers + clothes
-          const clothes = [["#C9F24D", 4], ["#E06", 7], ["#4AF", 10], ["#FFA", 13], ["#F90", 16]];
-          clothes.forEach(([col, x]) => {
-            px(x, 2, 1, 1, "#777"); // hanger hook
-            px(x - 1, 3, 3, 1, "#777"); // hanger bar
-            px(x - 1, 4, 3, Math.floor(Math.random() * 4) + 5, col);
-            px(x - 1, 4, 1, 2, shade(col, 0.7));
-          });
-        }
-        else if (type === "mirror") {
-          px(3, 0, 8, 18, "#4A4A6A"); px(4, 1, 6, 16, "#6A6A8A");
-          // glass
-          px(5, 2, 4, 14, "#3A3A5A");
-          // shine
-          px(5, 2, 1, 5, "rgba(255,255,255,0.15)"); px(6, 3, 1, 3, "rgba(255,255,255,0.1)");
-          // stand
-          px(5, 18, 4, 2, "#3A3A4A");
-        }
-        else if (type === "sneakers") {
-          // shelf frame
-          px(0, 0, 20, 20, "#5A5060"); px(1, 1, 18, 18, "#3A3040");
-          // shelves
-          px(1, 6, 18, 1, "#5A5060"); px(1, 13, 18, 1, "#5A5060");
-          // shoes - row 1
-          px(2, 2, 5, 3, "#E06"); px(9, 2, 5, 3, "#FFF"); px(15, 3, 3, 2, "#C9F24D");
-          // shoes - row 2
-          px(2, 8, 5, 3, "#333"); px(9, 8, 5, 3, "#4AF"); px(15, 9, 3, 2, "#F90");
-          // shoes - row 3
-          px(2, 15, 5, 3, "#FFA"); px(9, 15, 5, 3, "#E8A0E8"); px(15, 16, 3, 2, "#2A2A2A");
-        }
-        else if (type === "djbooth") {
-          // table
-          px(0, 6, 20, 10, "#2A2A3A"); px(0, 6, 20, 2, "#3A3A4A");
-          // turntable
-          px(2, 8, 8, 8, "#1A1A2A"); px(4, 10, 4, 4, "#333"); px(5, 11, 2, 2, R.accent);
-          // mixer
-          px(12, 8, 7, 4, "#1A1A2A");
-          px(13, 9, 1, 2, "#E06"); px(15, 9, 1, 2, "#4AF"); px(17, 9, 1, 2, "#C9F24D");
-          // speaker
-          px(12, 13, 7, 3, "#1A1A2A"); px(14, 14, 3, 1, "#444");
-        }
-        else if (type === "bed") {
-          const base = color || "#6A4A7A"; const dk = shade(base, 0.7); const lt = shade(base, 1.2);
-          // frame
-          px(0, 4, 24, 12, base); px(0, 4, 24, 2, lt);
-          // headboard
-          px(0, 0, 24, 5, shade(base, 1.1)); px(1, 1, 22, 3, base);
-          // pillows
-          px(2, 2, 6, 2, "#E8E0D0"); px(10, 2, 6, 2, "#D8D0C0");
-          // blanket
-          px(1, 7, 22, 8, dk); px(1, 7, 22, 1, shade(dk, 1.2));
-          // legs
-          px(0, 15, 2, 2, "#2A2A2A"); px(22, 15, 2, 2, "#2A2A2A");
-        }
-        else if (type === "plant") {
-          // pot
-          px(3, 12, 8, 6, "#8A5A3A"); px(4, 12, 6, 1, "#A06A4A"); px(4, 17, 6, 1, "#6A4A2A");
-          // leaves
-          px(4, 4, 6, 8, "#3A8A3A"); px(3, 6, 2, 4, "#2A7A2A"); px(9, 5, 2, 5, "#2A7A2A");
-          px(5, 2, 4, 3, "#4AAA4A"); px(6, 1, 2, 2, "#5ABA5A");
-          // flower
-          px(6, 1, 1, 1, R.accent);
-        }
-        else if (type === "bar") {
-          // counter
-          px(0, 4, 24, 12, "#5A5060"); px(0, 4, 24, 2, "#7A7090");
-          // top surface
-          px(1, 2, 22, 3, "#6A6080");
-          // drinks
-          px(3, 0, 2, 3, "#6AE4FF"); px(8, 0, 2, 4, "#E8A0E8"); px(13, 1, 2, 3, "#C9F24D"); px(18, 0, 2, 3, "#E06");
-          // front panels
-          px(2, 8, 6, 6, "#4A4050"); px(10, 8, 6, 6, "#4A4050"); px(18, 8, 4, 6, "#4A4050");
-        }
-      }, [type, color]);
-      const sizes = { couch: [40, 32], rack: [40, 40], mirror: [28, 40], sneakers: [40, 40], djbooth: [40, 32], bed: [48, 34], plant: [28, 36], bar: [48, 32] };
-      const [w, h] = sizes[type] || [40, 40];
-      return <canvas ref={canvasRef} width={w} height={h} style={{ width: "100%", height: "100%", imageRendering: "pixelated" }} />;
-    }
+    function FCouch({ c = "#6A5ACD" }) { return <PxF vw={40} vh={24}>{P(1,20,3,4,"#2A2A2A")}{P(36,20,3,4,"#2A2A2A")}{P(0,8,40,12,c)}{P(0,4,5,16,c)}{P(35,4,5,16,c)}{P(5,2,30,6,"#"+Math.min(0xFFFFFF,parseInt(c.slice(1),16)+0x202020).toString(16))}{P(6,9,12,8,"#"+Math.max(0,parseInt(c.slice(1),16)-0x151515).toString(16))}{P(22,9,12,8,"#"+Math.max(0,parseInt(c.slice(1),16)-0x151515).toString(16))}{P(8,4,5,3,"#E06")}{P(27,4,5,3,"#4AF")}</PxF>; }
+    function FTable() { return <PxF vw={32} vh={20}>{P(2,0,28,3,"#5A4A3A")}{P(2,0,28,1,"#7A6A5A")}{P(3,3,2,17,"#4A3A2A")}{P(27,3,2,17,"#4A3A2A")}{P(2,18,28,2,"#4A3A2A")}{P(10,1,4,1,"#333")}{P(18,1,4,1,"#333")}</PxF>; }
+    function FRack() { return <PxF vw={32} vh={36}>{P(2,0,2,36,"#888")}{P(28,0,2,36,"#888")}{P(4,1,24,2,"#AAA")}{P(7,4,4,12,"#C9F24D")}{P(7,4,1,3,"#9AB830")}{P(13,4,4,16,"#E06")}{P(13,4,1,4,"#A04040")}{P(19,4,4,10,"#4AF")}{P(19,4,1,3,"#3080C0")}{P(25,4,3,14,"#FFA")}{P(25,4,1,3,"#CC8800")}</PxF>; }
+    function FMirror() { return <PxF vw={16} vh={32}>{P(2,0,12,28,"#5A5A7A")}{P(3,1,10,26,"#3A3A5A")}{P(4,2,3,8,"rgba(255,255,255,0.08)")}{P(5,28,6,4,"#4A4A5A")}</PxF>; }
+    function FSneakers() { return <PxF vw={32} vh={28}>{P(0,0,32,28,"#5A5060")}{P(1,1,30,26,"#3A3040")}{P(1,9,30,1,"#5A5060")}{P(1,18,30,1,"#5A5060")}{P(3,3,8,5,"#E06")}{P(14,3,8,5,"#FFF")}{P(25,3,5,4,"#C9F24D")}{P(3,11,8,5,"#333")}{P(14,11,8,5,"#4AF")}{P(25,12,5,4,"#F90")}{P(3,20,8,5,"#FFA")}{P(14,20,8,5,"#E8A0E8")}{P(25,21,5,4,"#2A2A2A")}</PxF>; }
+    function FDJ() { return <PxF vw={40} vh={28}>{P(0,8,40,20,"#2A2A3A")}{P(0,8,40,3,"#3A3A4A")}{P(2,12,16,14,"#1A1A2A")}{P(6,16,8,8,"#333")}{P(9,19,2,2,R.accent)}{P(22,12,16,6,"#1A1A2A")}{P(24,14,3,3,"#E06")}{P(29,14,3,3,"#4AF")}{P(34,14,3,3,"#C9F24D")}{P(22,20,16,6,"#222")}{P(24,22,12,1,"#444")}{P(24,24,12,1,"#444")}</PxF>; }
+    function FBed({ c = "#6A4A7A" }) { const dk = "#"+Math.max(0,parseInt(c.slice(1),16)-0x1A1A1A).toString(16); return <PxF vw={48} vh={24}>{P(0,0,48,8,c)}{P(1,2,12,4,"#E8E0D0")}{P(16,2,12,4,"#D8D0C0")}{P(0,8,48,14,dk)}{P(0,8,48,2,c)}{P(0,20,4,4,"#2A2A2A")}{P(44,20,4,4,"#2A2A2A")}</PxF>; }
+    function FPlant() { return <PxF vw={16} vh={24}>{P(4,16,8,8,"#8A5A3A")}{P(5,16,6,1,"#A06A4A")}{P(4,6,8,10,"#3A8A3A")}{P(3,8,2,6,"#2A7A2A")}{P(11,7,2,6,"#2A7A2A")}{P(5,3,6,5,"#4AAA4A")}{P(7,1,3,3,"#5ABA5A")}{P(8,1,1,1,R.accent)}</PxF>; }
+    function FBar() { return <PxF vw={48} vh={20}>{P(0,6,48,14,"#5A5060")}{P(0,4,48,4,"#7A7090")}{P(0,2,48,3,"#6A6080")}{P(4,0,3,3,"#6AE4FF")}{P(12,0,3,4,"#E8A0E8")}{P(20,0,3,3,"#C9F24D")}{P(28,0,3,3,"#E06")}{P(36,0,3,4,"#FFA")}{P(2,10,8,8,"#4A4050")}{P(14,10,8,8,"#4A4050")}{P(26,10,8,8,"#4A4050")}{P(38,10,8,8,"#4A4050")}</PxF>; }
+    function FLamp() { return <PxF vw={12} vh={28}>{P(5,0,2,4,"#FFA")}{P(3,0,6,2,"#FFC")}{P(5,4,2,20,"#888")}{P(3,24,6,2,"#666")}{P(4,22,4,2,"#777")}</PxF>; }
+    function FTV() { return <PxF vw={28} vh={20}>{P(0,0,28,16,"#2A2A2A")}{P(1,1,26,14,"#1A1A3A")}{P(2,2,8,4,"#E06")}{P(12,3,6,3,"#4AF")}{P(20,2,6,5,"#C9F24D")}{P(4,8,20,5,"#2A2A4A")}{P(10,16,8,4,"#333")}{P(8,18,12,2,"#444")}</PxF>; }
+    function FRug() { return <PxF vw={40} vh={24}>{P(0,0,40,24,R.accent+"18")}{P(1,1,38,22,R.accent+"10")}{P(2,2,36,20,R.accent+"0C")}{P(4,4,32,16,R.accent+"08")}</PxF>; }
+    function FStool() { return <PxF vw={12} vh={16}>{P(2,0,8,4,"#5A4A3A")}{P(2,0,8,1,"#7A6A5A")}{P(3,4,2,12,"#4A3A2A")}{P(7,4,2,12,"#4A3A2A")}</PxF>; }
+    function FChair() { return <PxF vw={16} vh={24}>{P(2,6,12,4,"#5A5ACD")}{P(2,6,12,1,"#7A7AED")}{P(2,0,12,8,"#6A6ADA")}{P(3,10,2,14,"#3A3A3A")}{P(11,10,2,14,"#3A3A3A")}</PxF>; }
+    function FStars() { return <PxF vw={100} vh={40}>{[...Array(30)].map((_,i)=><circle key={i} cx={(i*37+5)%100} cy={(i*23+3)%40} r={i%5===0?1.5:0.7} fill={i%4===0?"#C9F24D":"#FFF"} opacity={i%3===0?0.8:0.25}/>)}<circle cx="85" cy="8" r="5" fill="#FFF" opacity="0.12"/><circle cx="82" cy="6" r="1.5" fill="#FFF" opacity="0.3"/></PxF>; }
 
-    // Room furniture layouts
+    // Room furniture layouts — packed with items
+    const [interacting, setInteracting] = useState(null); // { type, data }
     const FURNITURE = {
       studio: [
-        { x: 0, y: 0, w: 2, h: 1, comp: <PixelFurniture type="couch" color="#6A5ACD" />, label: "Couch" },
-        { x: 8, y: 0, w: 2, h: 2, comp: <PixelFurniture type="rack" />, label: "Clothing rack" },
-        { x: 0, y: 3, w: 1, h: 2, comp: <PixelFurniture type="mirror" />, label: "Mirror" },
-        { x: 5, y: 0, w: 2, h: 1, comp: <PixelFurniture type="sneakers" />, label: "Sneaker shelf" },
-        { x: 3, y: 5, w: 2, h: 1, comp: <PixelFurniture type="djbooth" />, label: "DJ booth" },
-        { x: 9, y: 5, w: 1, h: 1, comp: <PixelFurniture type="plant" />, label: "Plant" },
-        { x: 0, y: 6, w: 1, h: 1, comp: <PixelFurniture type="plant" />, label: "Plant" },
+        { x: 0, y: 0, w: 3, h: 1, comp: <FCouch c="#6A5ACD" /> },
+        { x: 4, y: 0, w: 1, h: 1, comp: <FTable /> },
+        { x: 6, y: 0, w: 2, h: 1, comp: <FSneakers /> },
+        { x: 8, y: 0, w: 2, h: 2, comp: <FRack /> },
+        { x: 0, y: 2, w: 1, h: 2, comp: <FMirror /> },
+        { x: 3, y: 2, w: 4, h: 2, comp: <FRug /> },
+        { x: 5, y: 2, w: 1, h: 1, comp: <FTable /> },
+        { x: 3, y: 3, w: 1, h: 1, comp: <FChair /> },
+        { x: 6, y: 3, w: 1, h: 1, comp: <FChair /> },
+        { x: 9, y: 3, w: 1, h: 1, comp: <FPlant /> },
+        { x: 3, y: 5, w: 2, h: 1, comp: <FDJ />, action: "dj" },
+        { x: 6, y: 5, w: 2, h: 1, comp: <FTV /> },
+        { x: 0, y: 6, w: 1, h: 1, comp: <FPlant /> },
+        { x: 9, y: 6, w: 1, h: 1, comp: <FLamp /> },
+        { x: 1, y: 5, w: 1, h: 1, comp: <FStool /> },
       ],
       bedroom: [
-        { x: 0, y: 0, w: 3, h: 1, comp: <PixelFurniture type="bed" color="#6A4A7A" />, label: "Bed" },
-        { x: 9, y: 0, w: 1, h: 1, comp: <PixelFurniture type="plant" />, label: "Plant" },
-        { x: 8, y: 2, w: 1, h: 2, comp: <PixelFurniture type="mirror" />, label: "Mirror" },
-        { x: 0, y: 5, w: 2, h: 1, comp: <PixelFurniture type="sneakers" />, label: "Dresser" },
-        { x: 5, y: 0, w: 2, h: 1, comp: <PixelFurniture type="couch" color="#7A4A8A" />, label: "Loveseat" },
+        { x: 0, y: 0, w: 3, h: 1, comp: <FBed c="#6A4A7A" /> },
+        { x: 4, y: 0, w: 1, h: 1, comp: <FLamp /> },
+        { x: 6, y: 0, w: 2, h: 1, comp: <FCouch c="#7A4A8A" /> },
+        { x: 9, y: 0, w: 1, h: 1, comp: <FPlant /> },
+        { x: 0, y: 2, w: 1, h: 2, comp: <FMirror /> },
+        { x: 8, y: 2, w: 2, h: 1, comp: <FSneakers /> },
+        { x: 3, y: 3, w: 4, h: 2, comp: <FRug /> },
+        { x: 4, y: 3, w: 1, h: 1, comp: <FTable /> },
+        { x: 5, y: 4, w: 1, h: 1, comp: <FChair /> },
+        { x: 0, y: 5, w: 2, h: 1, comp: <FTV /> },
+        { x: 9, y: 5, w: 1, h: 1, comp: <FLamp /> },
+        { x: 0, y: 6, w: 1, h: 1, comp: <FPlant /> },
+        { x: 3, y: 6, w: 2, h: 1, comp: <FRack /> },
       ],
       rooftop: [
-        { x: 0, y: 0, w: 3, h: 1, comp: <PixelFurniture type="bar" />, label: "Bar" },
-        { x: 7, y: 0, w: 2, h: 1, comp: <PixelFurniture type="couch" color="#4A6A7A" />, label: "Outdoor couch" },
-        { x: 0, y: 5, w: 1, h: 1, comp: <PixelFurniture type="plant" />, label: "Plant" },
-        { x: 9, y: 5, w: 1, h: 1, comp: <PixelFurniture type="plant" />, label: "Plant" },
-        { x: 4, y: 3, w: 2, h: 1, comp: <PixelFurniture type="djbooth" />, label: "Sound system" },
+        { x: 0, y: 0, w: 3, h: 1, comp: <FBar /> },
+        { x: 3, y: 0, w: 1, h: 1, comp: <FStool /> },
+        { x: 4, y: 0, w: 1, h: 1, comp: <FStool /> },
+        { x: 7, y: 0, w: 2, h: 1, comp: <FCouch c="#4A6A7A" /> },
+        { x: 0, y: 2, w: 1, h: 1, comp: <FPlant /> },
+        { x: 9, y: 2, w: 1, h: 1, comp: <FPlant /> },
+        { x: 3, y: 3, w: 4, h: 2, comp: <FRug /> },
+        { x: 4, y: 3, w: 2, h: 1, comp: <FDJ />, action: "dj" },
+        { x: 4, y: 4, w: 1, h: 1, comp: <FStool /> },
+        { x: 5, y: 4, w: 1, h: 1, comp: <FStool /> },
+        { x: 0, y: 5, w: 2, h: 1, comp: <FTable /> },
+        { x: 1, y: 5, w: 1, h: 1, comp: <FStool /> },
+        { x: 8, y: 5, w: 2, h: 1, comp: <FTable /> },
+        { x: 0, y: 6, w: 1, h: 1, comp: <FLamp /> },
+        { x: 9, y: 6, w: 1, h: 1, comp: <FLamp /> },
       ],
     };
+
+    // Check for interactions when player moves onto furniture
+    useEffect(() => {
+      const furn = (FURNITURE[room] || []);
+      const hit = furn.find(f => f.action && myPos.x >= f.x && myPos.x < f.x + f.w && myPos.y >= f.y && myPos.y < f.y + f.h);
+      if (hit?.action === "dj" && reading?.playlist) setInteracting({ type: "dj", playlist: reading.playlist });
+      else setInteracting(null);
+    }, [myPos, room]);
 
     // Realtime presence per room
     useEffect(() => {
@@ -1969,7 +1913,7 @@ export default function CosmicCloset() {
           {/* Wall */}
           <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "20%", background: R.wall, zIndex: 1 }}>
             <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 5, background: R.wallBase }} />
-            {room === "rooftop" && <svg viewBox="0 0 100 40" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>{[...Array(25)].map((_,i)=><circle key={i} cx={(i*37)%100} cy={(i*23)%40} r={i%5===0?1.5:0.8} fill={i%4===0?"#C9F24D":"#FFF"} opacity={i%3===0?0.8:0.3}/>)}<circle cx="85" cy="8" r="4" fill="#FFF" opacity="0.15"/><circle cx="80" cy="6" r="1" fill="#FFF" opacity="0.4"/></svg>}
+            {room === "rooftop" && <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}><FStars /></div>}
             {room === "studio" && <>
               <div style={{ position: "absolute", left: "6%", top: "10%", width: "16%", height: "75%", background: "#0D0D1A", border: "2px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ color: R.accent, fontSize: "clamp(14px, 2vw, 24px)", fontWeight: 700, fontFamily: fontStack }}>CC</span></div>
               <div style={{ position: "absolute", left: "28%", top: "10%", width: "16%", height: "75%", background: "#0D0D1A", border: "2px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: "clamp(16px, 2.5vw, 28px)" }}>✦</span></div>
@@ -2015,6 +1959,22 @@ export default function CosmicCloset() {
             })}
           </div>
         </div>
+
+        {/* DJ Interaction */}
+        {interacting?.type === "dj" && interacting.playlist?.length > 0 && (
+          <div style={{ padding: "12px 24px", borderTop: `1px solid ${R.accent}`, background: "rgba(0,0,0,0.3)" }}>
+            <div className="up" style={{ fontSize: 10, color: R.accent, marginBottom: 10, letterSpacing: "0.16em" }}>🎧 DJ Booth — Your Playlist</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {interacting.playlist.slice(0, 5).map((song, i) => (
+                <a key={i} href={`https://open.spotify.com/search/${encodeURIComponent(song.replace(/—/g, ""))}`} target="_blank" rel="noopener noreferrer"
+                  className="track" style={{ fontSize: 11, color: WHITE, background: "rgba(255,255,255,0.06)", border: `1px solid ${R.accent}40`, padding: "8px 12px", textDecoration: "none", fontFamily: fontStack, display: "flex", alignItems: "center", gap: 8, transition: "all .15s" }}>
+                  <span style={{ color: R.accent, fontWeight: 600 }}>{String(i + 1).padStart(2, "0")}</span> {song}
+                </a>
+              ))}
+            </div>
+            <div className="up" style={{ fontSize: 8, color: GREY, marginTop: 8, letterSpacing: "0.1em" }}>Tap a track to play it on Spotify</div>
+          </div>
+        )}
 
         {/* Chat */}
         <div style={{ display: "flex", gap: 8, padding: "12px 24px", borderTop: `1px solid ${LINE}` }}>
