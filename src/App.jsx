@@ -1799,16 +1799,24 @@ export default function CosmicCloset() {
         { x: 9, y: 6, w: 1, h: 1, comp: <FLamp /> },
       ],
       gameroom: [
-        { x: 1, y: 1, w: 2, h: 1, comp: <FGameTable game="tictactoe" />, action: "game", game: "tictactoe" },
-        { x: 0, y: 2, w: 1, h: 1, comp: <FStool /> },
-        { x: 3, y: 2, w: 1, h: 1, comp: <FStool /> },
-        { x: 6, y: 1, w: 2, h: 1, comp: <FGameTable game="connect4" />, action: "game", game: "connect4" },
-        { x: 5, y: 2, w: 1, h: 1, comp: <FStool /> },
-        { x: 8, y: 2, w: 1, h: 1, comp: <FStool /> },
+        // Row 1: Tic Tac Toe + Connect 4
         { x: 0, y: 0, w: 1, h: 1, comp: <FLamp /> },
+        { x: 1, y: 0, w: 2, h: 1, comp: <FGameTable game="tictactoe" />, action: "game", game: "tictactoe" },
+        { x: 0, y: 1, w: 1, h: 1, comp: <FStool /> },
+        { x: 3, y: 1, w: 1, h: 1, comp: <FStool /> },
+        { x: 6, y: 0, w: 2, h: 1, comp: <FGameTable game="connect4" />, action: "game", game: "connect4" },
+        { x: 5, y: 1, w: 1, h: 1, comp: <FStool /> },
+        { x: 8, y: 1, w: 1, h: 1, comp: <FStool /> },
         { x: 9, y: 0, w: 1, h: 1, comp: <FLamp /> },
-        { x: 3, y: 5, w: 4, h: 2, comp: <FRug /> },
-        { x: 4, y: 5, w: 2, h: 1, comp: <FCouch c="#5A3A2A" /> },
+        // Row 2: Blackjack + Slots
+        { x: 1, y: 3, w: 2, h: 1, comp: <FGameTable game="poker" />, action: "game", game: "blackjack" },
+        { x: 0, y: 4, w: 1, h: 1, comp: <FStool /> },
+        { x: 3, y: 4, w: 1, h: 1, comp: <FStool /> },
+        { x: 6, y: 3, w: 2, h: 1, comp: <FGameTable game="chess" />, action: "game", game: "slots" },
+        { x: 5, y: 4, w: 1, h: 1, comp: <FStool /> },
+        { x: 8, y: 4, w: 1, h: 1, comp: <FStool /> },
+        // Row 3: Pac-Man arcade + decor
+        { x: 4, y: 6, w: 2, h: 1, comp: <FTV />, action: "game", game: "pacman" },
         { x: 0, y: 6, w: 1, h: 1, comp: <FPlant /> },
         { x: 9, y: 6, w: 1, h: 1, comp: <FPlant /> },
       ],
@@ -2010,84 +2018,206 @@ export default function CosmicCloset() {
 
     // Game Panel — Tic Tac Toe & Connect 4
     function GamePanel({ game, accent }) {
-      const [board, setBoard] = useState(game === "connect4" ? Array(42).fill(null) : Array(9).fill(null));
-      const [isX, setIsX] = useState(true);
-      const [winner, setWinner] = useState(null);
+      const NAMES = { tictactoe: "Tic Tac Toe", connect4: "Connect 4", blackjack: "Blackjack", slots: "Slots", pacman: "Pac-Man" };
       const [credits, setCredits] = useState(100);
       const [bet, setBet] = useState(10);
       const [betPlaced, setBetPlaced] = useState(false);
+      const [gState, setGState] = useState(null); // game-specific state
 
-      // Load credits from profile
-      useEffect(() => {
-        if (user && cloudProfile?.credits != null) setCredits(cloudProfile.credits);
-      }, [cloudProfile]);
+      useEffect(() => { if (user && cloudProfile?.credits != null) setCredits(cloudProfile.credits); }, [cloudProfile]);
+      useEffect(() => { setGState(null); setBetPlaced(false); }, [game]);
 
-      async function saveCredits(newCredits) {
-        setCredits(newCredits);
-        if (user) {
-          try { await upsertProfile(user.id, { credits: newCredits }); } catch {}
+      async function saveCredits(n) { setCredits(n); if (user) try { await upsertProfile(user.id, { credits: n }); } catch {} }
+      function placeBet() { if (bet > credits || bet < 1) return; saveCredits(credits - bet); setBetPlaced(true); }
+
+      const cellBtn = { border: "1px solid rgba(255,255,255,0.15)", background: "rgba(0,0,0,0.3)", cursor: "pointer", fontFamily: fontStack, display: "flex", alignItems: "center", justifyContent: "center" };
+      const needsBet = ["blackjack", "slots", "tictactoe", "connect4"].includes(game);
+
+      // ---- Tic Tac Toe ----
+      function TTT() {
+        const [board, setBoard] = useState(Array(9).fill(null));
+        const [isX, setIsX] = useState(true);
+        const [winner, setWinner] = useState(null);
+        const check = b => { const L=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]]; for(const[a,c,d]of L){if(b[a]&&b[a]===b[c]&&b[a]===b[d])return b[a];}return b.every(Boolean)?"draw":null; };
+        const play = i => { if(board[i]||winner)return; const n=[...board];n[i]=isX?"X":"O";setBoard(n);setIsX(!isX); const w=check(n); if(w){setWinner(w);if(betPlaced){if(w==="X")saveCredits(credits+bet*2);else if(w==="draw")saveCredits(credits+bet);}} };
+        return <div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:4,maxWidth:240,margin:"0 auto"}}>{board.map((c,i)=><button key={i} onClick={()=>play(i)} style={{...cellBtn,aspectRatio:"1",fontSize:28,color:c==="X"?"#E06":"#4AF",fontWeight:700}}>{c||""}</button>)}</div>
+          <div className="up" style={{textAlign:"center",marginTop:12,fontSize:10,color:winner?accent:GREY}}>{winner?(winner==="draw"?"Draw!":`${winner} wins!${betPlaced&&winner==="X"?` +${bet*2} 💰`:""}`):`${isX?"X":"O"}'s turn`}
+          {winner&&<><br/><button className="up" onClick={()=>{setBoard(Array(9).fill(null));setIsX(true);setWinner(null);setBetPlaced(false);}} style={{background:accent,color:BLACK,border:"none",padding:"8px 20px",fontSize:10,fontFamily:fontStack,cursor:"pointer",marginTop:8}}>Again</button></>}</div>
+        </div>;
+      }
+
+      // ---- Connect 4 ----
+      function C4() {
+        const [board, setBoard] = useState(Array(42).fill(null));
+        const [isR, setIsR] = useState(true);
+        const [winner, setWinner] = useState(null);
+        const check = b => { const at=(r,c)=>(r>=0&&r<6&&c>=0&&c<7)?b[r*7+c]:null; for(let r=0;r<6;r++)for(let c=0;c<7;c++){const v=at(r,c);if(!v)continue;if(c+3<7&&v===at(r,c+1)&&v===at(r,c+2)&&v===at(r,c+3))return v;if(r+3<6&&v===at(r+1,c)&&v===at(r+2,c)&&v===at(r+3,c))return v;if(r+3<6&&c+3<7&&v===at(r+1,c+1)&&v===at(r+2,c+2)&&v===at(r+3,c+3))return v;if(r+3<6&&c-3>=0&&v===at(r+1,c-1)&&v===at(r+2,c-2)&&v===at(r+3,c-3))return v;}return b.every(Boolean)?"draw":null; };
+        const drop = col => { if(winner)return; let row=-1; for(let r=5;r>=0;r--){if(!board[r*7+col]){row=r;break;}} if(row===-1)return; const n=[...board];n[row*7+col]=isR?"R":"Y";setBoard(n);setIsR(!isR); const w=check(n); if(w){setWinner(w);if(betPlaced){if(w==="R")saveCredits(credits+bet*2);else if(w==="draw")saveCredits(credits+bet);}} };
+        return <div style={{maxWidth:300,margin:"0 auto"}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3}}>
+            {[...Array(7)].map((_,c)=><button key={c} onClick={()=>drop(c)} style={{background:"transparent",color:isR?"#E06":"#FFD700",border:`1px solid ${LINE}`,padding:4,fontSize:10,fontFamily:fontStack,cursor:"pointer"}}>▼</button>)}
+            {board.map((cell,i)=><div key={i} style={{aspectRatio:"1",background:"rgba(0,0,0,0.4)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}}>{cell&&<div style={{width:"75%",height:"75%",borderRadius:"50%",background:cell==="R"?"#E06":"#FFD700"}}/>}</div>)}
+          </div>
+          <div className="up" style={{textAlign:"center",marginTop:12,fontSize:10,color:winner?accent:GREY}}>{winner?(winner==="draw"?"Draw!":`${winner} wins!`):`${isR?"Red":"Yellow"}'s turn`}
+          {winner&&<><br/><button className="up" onClick={()=>{setBoard(Array(42).fill(null));setIsR(true);setWinner(null);setBetPlaced(false);}} style={{background:accent,color:BLACK,border:"none",padding:"8px 20px",fontSize:10,fontFamily:fontStack,cursor:"pointer",marginTop:8}}>Again</button></>}</div>
+        </div>;
+      }
+
+      // ---- Blackjack ----
+      function BJ() {
+        const deck = () => { const suits=["♠","♥","♦","♣"]; const vals=["A","2","3","4","5","6","7","8","9","10","J","Q","K"]; const d=[]; for(const s of suits)for(const v of vals)d.push({s,v,n:v==="A"?11:["J","Q","K"].includes(v)?10:parseInt(v)}); for(let i=d.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[d[i],d[j]]=[d[j],d[i]];} return d; };
+        const [d, setD] = useState(deck);
+        const [pi, setPi] = useState(0);
+        const [player, setPlayer] = useState([]);
+        const [dealer, setDealer] = useState([]);
+        const [phase, setPhase] = useState("deal"); // deal, player, dealer, done
+        const [result, setResult] = useState("");
+
+        const score = hand => { let t=hand.reduce((a,c)=>a+c.n,0); let aces=hand.filter(c=>c.v==="A").length; while(t>21&&aces>0){t-=10;aces--;} return t; };
+        const cardStyle = { display:"inline-flex",flexDirection:"column",alignItems:"center",justifyContent:"center",width:44,height:62,background:WHITE,color:BLACK,borderRadius:4,fontFamily:fontStack,fontSize:14,fontWeight:700,margin:2,boxShadow:"0 2px 4px rgba(0,0,0,0.3)" };
+
+        function deal() {
+          const nd = deck(); setD(nd);
+          setPlayer([nd[0],nd[2]]); setDealer([nd[1],nd[3]]); setPi(4);
+          if(score([nd[0],nd[2]])===21){setPhase("done");setResult("blackjack");saveCredits(credits+Math.floor(bet*2.5));return;}
+          setPhase("player"); setResult("");
         }
-      }
-
-      function checkWinTTT(b) {
-        const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-        for (const [a,c,d] of lines) { if (b[a] && b[a] === b[c] && b[a] === b[d]) return b[a]; }
-        return b.every(Boolean) ? "draw" : null;
-      }
-
-      function checkWinC4(b) {
-        const COLS = 7, ROWS = 6;
-        const at = (r, c) => (r >= 0 && r < ROWS && c >= 0 && c < COLS) ? b[r * COLS + c] : null;
-        for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
-          const v = at(r, c); if (!v) continue;
-          if (c + 3 < COLS && v === at(r,c+1) && v === at(r,c+2) && v === at(r,c+3)) return v;
-          if (r + 3 < ROWS && v === at(r+1,c) && v === at(r+2,c) && v === at(r+3,c)) return v;
-          if (r + 3 < ROWS && c + 3 < COLS && v === at(r+1,c+1) && v === at(r+2,c+2) && v === at(r+3,c+3)) return v;
-          if (r + 3 < ROWS && c - 3 >= 0 && v === at(r+1,c-1) && v === at(r+2,c-2) && v === at(r+3,c-3)) return v;
+        function hit() {
+          const np=[...player,d[pi]]; setPlayer(np); setPi(pi+1);
+          if(score(np)>21){setPhase("done");setResult("bust");}
         }
-        return b.every(Boolean) ? "draw" : null;
+        function stand() {
+          let dh=[...dealer]; let di=pi;
+          while(score(dh)<17){dh.push(d[di]);di++;}
+          setDealer(dh); setPi(di); setPhase("done");
+          const ps=score(player),ds=score(dh);
+          if(ds>21){setResult("win");saveCredits(credits+bet*2);}
+          else if(ps>ds){setResult("win");saveCredits(credits+bet*2);}
+          else if(ps===ds){setResult("push");saveCredits(credits+bet);}
+          else setResult("lose");
+        }
+        useEffect(()=>{if(betPlaced&&phase==="deal")deal();},[betPlaced]);
+
+        const Card = ({c,hidden}) => <div style={{...cardStyle,color:["♥","♦"].includes(c?.s)?"#E06":"#1A1A2A"}}>{hidden?<span style={{color:GREY}}>?</span>:<><span style={{fontSize:10}}>{c.s}</span><span>{c.v}</span></>}</div>;
+
+        return <div style={{textAlign:"center"}}>
+          {phase==="deal"&&!betPlaced&&<div className="up" style={{color:GREY,fontSize:10,padding:20}}>Place a bet to play</div>}
+          {(phase!=="deal"||betPlaced)&&<>
+            <div style={{marginBottom:12}}><span className="up" style={{fontSize:9,color:GREY}}>Dealer{phase==="done"?` (${score(dealer)})`:""}</span><div style={{display:"flex",justifyContent:"center",margin:"6px 0"}}>{dealer.map((c,i)=><Card key={i} c={c} hidden={phase!=="done"&&i===1}/>)}</div></div>
+            <div style={{marginBottom:12}}><span className="up" style={{fontSize:9,color:accent}}>You ({score(player)})</span><div style={{display:"flex",justifyContent:"center",margin:"6px 0"}}>{player.map((c,i)=><Card key={i} c={c}/>)}</div></div>
+            {phase==="player"&&<div style={{display:"flex",gap:8,justifyContent:"center"}}><button className="up" onClick={hit} style={{background:accent,color:BLACK,border:"none",padding:"8px 16px",fontSize:10,fontFamily:fontStack,cursor:"pointer"}}>Hit</button><button className="up" onClick={stand} style={{background:"transparent",color:WHITE,border:`1px solid ${LINE}`,padding:"8px 16px",fontSize:10,fontFamily:fontStack,cursor:"pointer"}}>Stand</button></div>}
+            {phase==="done"&&<div><div className="up" style={{fontSize:12,color:result==="win"||result==="blackjack"?"#FFD700":result==="push"?GREY:"#E06",marginBottom:8}}>{result==="blackjack"?`Blackjack! +${Math.floor(bet*2.5)} 💰`:result==="win"?`You win! +${bet*2} 💰`:result==="push"?"Push — bet returned":`Bust! Lost ${bet} 💰`}</div><button className="up" onClick={()=>{setPhase("deal");setPlayer([]);setDealer([]);setBetPlaced(false);}} style={{background:accent,color:BLACK,border:"none",padding:"8px 20px",fontSize:10,fontFamily:fontStack,cursor:"pointer"}}>Deal again</button></div>}
+          </>}
+        </div>;
       }
 
-      function playTTT(i) {
-        if (board[i] || winner) return;
-        const next = [...board]; next[i] = isX ? "X" : "O";
-        setBoard(next); setIsX(!isX);
-        const w = checkWinTTT(next);
-        if (w) { setWinner(w); if (betPlaced) { if (w === "X") saveCredits(credits + bet * 2); else if (w === "draw") saveCredits(credits + bet); } }
+      // ---- Slots ----
+      function SlotsGame() {
+        const syms = ["🍒","🍋","🔔","⭐","💎","7️⃣"];
+        const [reels, setReels] = useState(["⭐","⭐","⭐"]);
+        const [spinning, setSpinning] = useState(false);
+        const [result, setResult] = useState("");
+
+        function spin() {
+          if(!betPlaced||spinning) return;
+          setSpinning(true); setResult("");
+          let count = 0;
+          const iv = setInterval(() => {
+            setReels([syms[Math.floor(Math.random()*6)],syms[Math.floor(Math.random()*6)],syms[Math.floor(Math.random()*6)]]);
+            count++;
+            if(count>=15){
+              clearInterval(iv);
+              const final = [syms[Math.floor(Math.random()*6)],syms[Math.floor(Math.random()*6)],syms[Math.floor(Math.random()*6)]];
+              setReels(final); setSpinning(false);
+              if(final[0]===final[1]&&final[1]===final[2]){
+                const mult = final[0]==="💎"?10:final[0]==="7️⃣"?7:final[0]==="⭐"?5:3;
+                setResult(`Jackpot! +${bet*mult} 💰`); saveCredits(credits+bet*mult);
+              } else if(final[0]===final[1]||final[1]===final[2]||final[0]===final[2]){
+                setResult(`Match! +${bet*2} 💰`); saveCredits(credits+bet*2);
+              } else { setResult(`No match. Lost ${bet} 💰`); }
+              setBetPlaced(false);
+            }
+          }, 80);
+        }
+        useEffect(()=>{if(betPlaced&&!spinning)spin();},[betPlaced]);
+
+        return <div style={{textAlign:"center"}}>
+          <div style={{display:"flex",justifyContent:"center",gap:8,margin:"16px 0"}}>
+            {reels.map((s,i)=><div key={i} style={{width:64,height:80,background:"rgba(0,0,0,0.5)",border:`2px solid ${spinning?accent:LINE}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:36,transition:"border .2s"}}>{s}</div>)}
+          </div>
+          {result&&<div className="up" style={{fontSize:11,color:result.includes("Jackpot")||result.includes("Match")?accent:"#E06",marginBottom:8}}>{result}</div>}
+          {!betPlaced&&!spinning&&<div className="up" style={{color:GREY,fontSize:9}}>Place a bet and spin!</div>}
+        </div>;
       }
 
-      function playC4(col) {
-        if (winner) return;
-        const COLS = 7;
-        // Find lowest empty row in this column
-        let row = -1;
-        for (let r = 5; r >= 0; r--) { if (!board[r * COLS + col]) { row = r; break; } }
-        if (row === -1) return;
-        const next = [...board]; next[row * COLS + col] = isX ? "R" : "Y";
-        setBoard(next); setIsX(!isX);
-        const w = checkWinC4(next);
-        if (w) { setWinner(w); if (betPlaced) { if (w === "R") saveCredits(credits + bet * 2); else if (w === "draw") saveCredits(credits + bet); } }
+      // ---- Pac-Man ----
+      function PacMan() {
+        const W=15, H=11;
+        const walls = new Set(["0,0","1,0","2,0","3,0","4,0","5,0","9,0","10,0","11,0","12,0","13,0","14,0","0,1","14,1","0,2","2,2","3,2","5,2","6,2","8,2","9,2","11,2","12,2","14,2","0,4","2,4","3,4","5,4","6,4","7,4","8,4","9,4","11,4","12,4","14,4","0,5","14,5","0,6","2,6","3,6","5,6","6,6","8,6","9,6","11,6","12,6","14,6","0,8","2,8","3,8","5,8","6,8","8,8","9,8","11,8","12,8","14,8","0,9","14,9","0,10","1,10","2,10","3,10","4,10","5,10","9,10","10,10","11,10","12,10","13,10","14,10"]);
+        const [pos, setPos] = useState({x:7,y:5});
+        const [ghosts, setGhosts] = useState([{x:1,y:1},{x:13,y:1},{x:1,y:9},{x:13,y:9}]);
+        const [dots, setDots] = useState(()=>{const d=new Set();for(let y=0;y<H;y++)for(let x=0;x<W;x++)if(!walls.has(`${x},${y}`))d.add(`${x},${y}`);d.delete("7,5");return d;});
+        const [sc, setSc] = useState(0);
+        const [dead, setDead] = useState(false);
+        const [won, setWon] = useState(false);
+
+        useEffect(()=>{
+          function onKey(e){
+            if(dead||won)return;
+            let dx=0,dy=0;
+            if(e.key==="ArrowUp")dy=-1;if(e.key==="ArrowDown")dy=1;if(e.key==="ArrowLeft")dx=-1;if(e.key==="ArrowRight")dx=1;
+            if(!dx&&!dy)return; e.preventDefault(); e.stopPropagation();
+            setPos(p=>{const nx=p.x+dx,ny=p.y+dy;if(nx<0||nx>=W||ny<0||ny>=H||walls.has(`${nx},${ny}`))return p;const k=`${nx},${ny}`;setDots(prev=>{const n=new Set(prev);if(n.has(k)){n.delete(k);setSc(s=>s+10);if(n.size===0)setWon(true);}return n;});return{x:nx,y:ny};});
+          }
+          window.addEventListener("keydown",onKey,true);
+          return ()=>window.removeEventListener("keydown",onKey,true);
+        },[dead,won]);
+
+        // Ghost movement
+        useEffect(()=>{
+          if(dead||won)return;
+          const iv=setInterval(()=>{
+            setGhosts(prev=>prev.map(g=>{
+              const dirs=[{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}].filter(d=>!walls.has(`${g.x+d.dx},${g.y+d.dy}`)&&g.x+d.dx>=0&&g.x+d.dx<W&&g.y+d.dy>=0&&g.y+d.dy<H);
+              if(!dirs.length)return g;
+              const d=dirs[Math.floor(Math.random()*dirs.length)];
+              return{x:g.x+d.dx,y:g.y+d.dy};
+            }));
+          },500);
+          return ()=>clearInterval(iv);
+        },[dead,won]);
+
+        // Check ghost collision
+        useEffect(()=>{if(ghosts.some(g=>g.x===pos.x&&g.y===pos.y))setDead(true);},[pos,ghosts]);
+
+        const px = 100/W, py = 100/H;
+        return <div style={{position:"relative",width:"100%",maxWidth:400,aspectRatio:`${W}/${H}`,margin:"0 auto",background:"#000",border:`2px solid ${accent}`}}>
+          {/* Walls */}
+          {[...walls].map(k=>{const[x,y]=k.split(",").map(Number);return<div key={k} style={{position:"absolute",left:`${x*px}%`,top:`${y*py}%`,width:`${px}%`,height:`${py}%`,background:"#1A1A4A"}}/>;})}
+          {/* Dots */}
+          {[...dots].map(k=>{const[x,y]=k.split(",").map(Number);return<div key={`d${k}`} style={{position:"absolute",left:`${x*px+px*0.35}%`,top:`${y*py+py*0.35}%`,width:`${px*0.3}%`,height:`${py*0.3}%`,background:"#FFD700",borderRadius:"50%"}}/>;})}
+          {/* Pac-Man */}
+          <div style={{position:"absolute",left:`${pos.x*px+px*0.1}%`,top:`${pos.y*py+py*0.1}%`,width:`${px*0.8}%`,height:`${py*0.8}%`,background:"#FFD700",borderRadius:"50%",transition:"left .15s,top .15s",zIndex:5}}/>
+          {/* Ghosts */}
+          {ghosts.map((g,i)=><div key={i} style={{position:"absolute",left:`${g.x*px+px*0.1}%`,top:`${g.y*py+py*0.1}%`,width:`${px*0.8}%`,height:`${py*0.8}%`,background:["#E06","#4AF","#F90","#E8A0E8"][i],borderRadius:"50% 50% 0 0",transition:"left .4s,top .4s",zIndex:4}}/>)}
+          {/* Overlay */}
+          {(dead||won)&&<div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.7)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:10}}>
+            <div className="up" style={{fontSize:14,color:won?accent:"#E06",marginBottom:8}}>{won?"You win!":"Game over!"}</div>
+            <div style={{color:"#FFD700",fontSize:12,marginBottom:12}}>Score: {sc}</div>
+            <button className="up" onClick={()=>{setPos({x:7,y:5});setGhosts([{x:1,y:1},{x:13,y:1},{x:1,y:9},{x:13,y:9}]);const d=new Set();for(let y=0;y<H;y++)for(let x=0;x<W;x++)if(!walls.has(`${x},${y}`))d.add(`${x},${y}`);d.delete("7,5");setDots(d);setSc(0);setDead(false);setWon(false);}} style={{background:accent,color:BLACK,border:"none",padding:"8px 20px",fontSize:10,fontFamily:fontStack,cursor:"pointer"}}>Play again</button>
+          </div>}
+        </div>;
       }
-
-      function reset() { setBoard(game === "connect4" ? Array(42).fill(null) : Array(9).fill(null)); setIsX(true); setWinner(null); setBetPlaced(false); }
-
-      function placeBet() {
-        if (bet > credits || bet < 1) return;
-        saveCredits(credits - bet);
-        setBetPlaced(true);
-      }
-
-      const cellBtn = { border: `1px solid rgba(255,255,255,0.15)`, background: "rgba(0,0,0,0.3)", cursor: "pointer", fontFamily: fontStack, display: "flex", alignItems: "center", justifyContent: "center" };
 
       return (
         <div style={{ padding: "16px 24px", borderTop: `2px solid ${accent}`, background: "rgba(0,0,0,0.4)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <span className="up" style={{ fontSize: 11, color: accent, letterSpacing: "0.16em" }}>🎮 {game === "tictactoe" ? "Tic Tac Toe" : "Connect 4"}</span>
+            <span className="up" style={{ fontSize: 11, color: accent, letterSpacing: "0.16em" }}>🎮 {NAMES[game] || game}</span>
             <span className="up" style={{ fontSize: 10, color: "#FFD700" }}>💰 {credits} credits</span>
           </div>
 
-          {/* Betting */}
-          {!betPlaced && !winner && (
+          {needsBet && !betPlaced && (
             <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14, flexWrap: "wrap" }}>
               <span className="up" style={{ fontSize: 9, color: GREY }}>Bet:</span>
               {[5, 10, 25, 50].map(b => (
@@ -2097,49 +2227,14 @@ export default function CosmicCloset() {
             </div>
           )}
 
-          {/* Game board */}
-          <div style={{ maxWidth: 360, margin: "0 auto" }}>
-            {game === "tictactoe" ? (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4 }}>
-                {board.map((cell, i) => (
-                  <button key={i} onClick={() => playTTT(i)} style={{ ...cellBtn, aspectRatio: "1", fontSize: 28, color: cell === "X" ? "#E06" : "#4AF", fontWeight: 700 }}>{cell || ""}</button>
-                ))}
-              </div>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
-                {/* Column buttons */}
-                {[...Array(7)].map((_, c) => (
-                  <button key={`drop${c}`} onClick={() => playC4(c)} className="up" style={{ background: "transparent", color: isX ? "#E06" : "#FFD700", border: `1px solid ${LINE}`, padding: "4px", fontSize: 8, fontFamily: fontStack, cursor: "pointer" }}>▼</button>
-                ))}
-                {board.map((cell, i) => (
-                  <div key={i} style={{ aspectRatio: "1", background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {cell && <div style={{ width: "75%", height: "75%", borderRadius: "50%", background: cell === "R" ? "#E06" : "#FFD700" }} />}
-                  </div>
-                ))}
-              </div>
-            )}
+          <div style={{ maxWidth: 420, margin: "0 auto" }}>
+            {game === "tictactoe" && <TTT />}
+            {game === "connect4" && <C4 />}
+            {game === "blackjack" && <BJ />}
+            {game === "slots" && <SlotsGame />}
+            {game === "pacman" && <PacMan />}
           </div>
-
-          {/* Status */}
-          <div style={{ textAlign: "center", marginTop: 14 }}>
-            {winner ? (
-              <div>
-                <div className="up" style={{ fontSize: 12, color: accent, marginBottom: 8 }}>
-                  {winner === "draw" ? "It's a draw!" : `${winner} wins!`}
-                  {betPlaced && winner !== "draw" && winner === (game === "tictactoe" ? "X" : "R") && <span style={{ color: "#FFD700" }}> +{bet * 2} 💰</span>}
-                  {betPlaced && winner === "draw" && <span style={{ color: GREY }}> Bet returned</span>}
-                  {betPlaced && winner !== "draw" && winner !== (game === "tictactoe" ? "X" : "R") && <span style={{ color: "#E06" }}> Lost {bet} 💰</span>}
-                </div>
-                <button className="up" onClick={reset} style={{ background: accent, color: BLACK, border: "none", padding: "8px 20px", fontSize: 10, fontFamily: fontStack, cursor: "pointer", fontWeight: 600 }}>Play again</button>
-              </div>
-            ) : (
-              <div className="up" style={{ fontSize: 9, color: GREY }}>
-                {game === "tictactoe" ? `${isX ? "X" : "O"}'s turn` : `${isX ? "Red" : "Yellow"}'s turn`}
-                {betPlaced && <span style={{ color: "#FFD700", marginLeft: 10 }}>Bet: {bet} 💰</span>}
-              </div>
-            )}
-          </div>
-          <div className="up" style={{ fontSize: 8, color: DIM, marginTop: 10, letterSpacing: "0.1em", textAlign: "center" }}>Walk onto a game table to play · Walk away to leave</div>
+          <div className="up" style={{ fontSize: 8, color: DIM, marginTop: 10, letterSpacing: "0.1em", textAlign: "center" }}>Walk onto a game table to play · Walk away to leave{game === "pacman" && " · Arrow keys to move"}</div>
         </div>
       );
     }
